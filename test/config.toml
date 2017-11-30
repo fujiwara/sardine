@@ -1,0 +1,5 @@
+[plugin.metrics.memcached]
+command = "mackerel-plugin-memcached"
+
+[plugin.check.bar]
+command = "echo check bar"
