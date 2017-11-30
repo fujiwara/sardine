@@ -23,13 +23,14 @@ $ sardine-agent -config config.toml
 
 sardine-agent works as below.
 
-1. Execute command for each [plugin.metrics.*] section.
+1. Execute a `command` for each `[plugin.metrics.*]` sections.
   - interval 60 sec.
-2. Put metrics got from plugin's to CloudWatch metrics.
+2. Put metrics got from command's output to CloudWatch metrics.
   - e.g. `memcached.cmd.cmd_get  10.0  1512057958` put as
-    - Namespace:"memcached/cmd"
-    - Value=10.0
-    - Timestamp=2017-12-01T16:05:58Z
+    - Namespace: memcached/cmd
+    - MetricName: cmd_get
+    - Value: 10.0
+    - Timestamp: 2017-12-01T16:05:58Z
 
 ## Author
 
