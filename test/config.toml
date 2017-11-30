@@ -1,5 +1,6 @@
 [plugin.metrics.memcached]
-command = "mackerel-plugin-memcached"
+command = 'mackerel-plugin-memcached --host 127.0.0.1 --port {{ env "MEMCACHED_PORT" "11211" }}'
+dimensions = ["Instance-Id=i-12345678", "Host=127.0.0.1"]
 
 [plugin.check.bar]
 command = "echo check bar"

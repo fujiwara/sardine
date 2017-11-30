@@ -17,9 +17,10 @@ import (
 )
 
 type MetricPlugin struct {
-	ID      string
-	Command string
-	Timeout time.Duration
+	ID         string
+	Command    string
+	Timeout    time.Duration
+	Dimensions [][]*cloudwatch.Dimension
 }
 
 type Metric struct {
@@ -29,18 +30,17 @@ type Metric struct {
 	Timestamp time.Time
 }
 
-func (m *Metric) NewMetricDatum() *cloudwatch.MetricDatum {
+func (m *Metric) NewMetricDatum(ds []*cloudwatch.Dimension) *cloudwatch.MetricDatum {
 	return &cloudwatch.MetricDatum{
 		MetricName: &m.Name,
 		Value:      &m.Value,
 		Timestamp:  &m.Timestamp,
+		Dimensions: ds,
 	}
 }
 
-const metricDelimitor = "\t"
-
 func parseMetricLine(b string) (*Metric, error) {
-	cols := strings.SplitN(b, metricDelimitor, 3)
+	cols := strings.SplitN(b, "\t", 3)
 	if len(cols) < 3 {
 		return nil, errors.New("invalid metric format. insufficient columns")
 	}
@@ -70,17 +70,22 @@ func parseMetricLine(b string) (*Metric, error) {
 	return &m, nil
 }
 
-func (m *MetricPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
+func (mp *MetricPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
 	ticker := time.NewTicker(time.Minute)
-	log.Printf("[%s]: starting", m.ID)
+	log.Printf("[%s]: starting", mp.ID)
 	for {
-		metrics, err := m.Execute(ctx)
+		metrics, err := mp.Execute(ctx)
 		if err != nil {
-			log.Printf("[%s]: %s", m.ID, err)
+			log.Printf("[%s]: %s", mp.ID, err)
 		}
 		mds := make(map[string][]*cloudwatch.MetricDatum)
 		for _, metric := range metrics {
-			mds[metric.Namespace] = append(mds[metric.Namespace], metric.NewMetricDatum())
+			ns := metric.Namespace
+			for _, ds := range mp.Dimensions {
+				mds[ns] = append(mds[ns], metric.NewMetricDatum(ds))
+			}
+			// no dimention metric
+			mds[ns] = append(mds[ns], metric.NewMetricDatum(nil))
 		}
 		for ns, data := range mds {
 			ch <- &cloudwatch.PutMetricDataInput{
@@ -98,16 +103,16 @@ func (m *MetricPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDat
 	}
 }
 
-func (m *MetricPlugin) Execute(_ctx context.Context) ([]*Metric, error) {
+func (mp *MetricPlugin) Execute(_ctx context.Context) ([]*Metric, error) {
 	var (
 		err     error
 		metrics []*Metric
 	)
 
-	ctx, cancel := context.WithTimeout(_ctx, m.Timeout)
+	ctx, cancel := context.WithTimeout(_ctx, mp.Timeout)
 	defer cancel()
 
-	args, err := shellwords.Parse(m.Command)
+	args, err := shellwords.Parse(mp.Command)
 	if err != nil {
 		return nil, errors.Wrap(err, "parse command failed")
 	}

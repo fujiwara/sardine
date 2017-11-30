@@ -1,16 +1,35 @@
 # sardine
-Mackerel metrics aggregator with CloudWatch.
+
+Mackerel plugin metrics aggregator with CloudWatch.
 
 ## Configuration
 
-```
+```toml
+# config.toml
+
 [plugin.metrics.memcached]
-command = "mackerel-plugin-memcached"
+command = "mackerel-plugin-memcached --host localhost --port 11211"
+dimentions = ["Instance-Id=i-12345678", "Instance-Type=m4.large"] # "Name=Value[,Name=Value...]"
+
+[plugin.metrics.xxxx]
+command = "...."
 ```
 
 ```console
 $ sardine-agent -config config.toml
 ```
+
+## How sardine works
+
+sardine-agent works as below.
+
+1. Execute command for each [plugin.metrics.*] section.
+  - interval 60 sec.
+2. Put metrics got from plugin's to CloudWatch metrics.
+  - e.g. `memcached.cmd.cmd_get  10.0  1512057958` put as
+    - Namespace:"memcached/cmd"
+    - Value=10.0
+    - Timestamp=2017-12-01T16:05:58Z
 
 ## Author
 
