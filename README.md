@@ -9,7 +9,10 @@ Mackerel plugin metrics aggregator with CloudWatch.
 
 [plugin.metrics.memcached]
 command = "mackerel-plugin-memcached --host localhost --port 11211"
-dimentions = ["Instance-Id=i-12345678", "Instance-Type=m4.large"] # "Name=Value[,Name=Value...]"
+dimentions = [
+  "ClusterName=mycluster",
+  "ClusterName=mycluster,AvailabilityZone=az-a"
+] # "Name=Value[,Name=Value...]"
 
 [plugin.metrics.xxxx]
 command = "...."
@@ -18,6 +21,10 @@ command = "...."
 ```console
 $ sardine-agent -config config.toml
 ```
+
+AWS credentials for access to CloudWatch are read from environment variables or instance profile.
+
+- `AWS_REGION`: required. e.g. `ap-northeast-1`
 
 ## How sardine works
 
