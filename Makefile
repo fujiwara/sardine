@@ -5,7 +5,7 @@ setup:
 		github.com/laher/goxc \
 		github.com/tcnksm/ghr \
 		github.com/golang/lint/golint \
-		github.com/golang/dep
+		github.com/golang/dep/cmd/dep
 	go get -d -t ./...
 	dep ensure
 
