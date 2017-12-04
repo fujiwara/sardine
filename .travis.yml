@@ -8,5 +8,4 @@ go:
 
 install:
   - make clean
-  - make get-deps
   - make test
