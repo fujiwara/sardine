@@ -24,7 +24,7 @@ command = "memping -s localhost:11211"
 ```
 
 ```console
-$ sardine-agent -config config.toml
+$ sardine -config config.toml
 ```
 
 AWS credentials for access to CloudWatch are read from environment variables or instance profile.
@@ -33,7 +33,7 @@ AWS credentials for access to CloudWatch are read from environment variables or 
 
 ## How sardine works
 
-sardine-agent works as below.
+sardine works as below.
 
 1. Execute `command` for each `[plugin.metrics.*]` sections.
    - interval 60 sec.
