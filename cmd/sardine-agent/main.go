@@ -11,6 +11,7 @@ import (
 func main() {
 	var config string
 	flag.StringVar(&config, "config", "", "config file path")
+	flag.BoolVar(&sardine.Debug, "debug", false, "enable debug logging")
 	flag.Parse()
 	err := sardine.Run(config)
 	if err != nil {
