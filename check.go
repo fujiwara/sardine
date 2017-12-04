@@ -54,7 +54,7 @@ func (cp *CheckPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDat
 		for _, ds := range cp.Dimensions {
 			md = append(md, res.NewMetricDatum(ds, now))
 		}
-		// no dimention metric
+		// no dimension metric
 		md = append(md, res.NewMetricDatum(nil, now))
 
 		ch <- &cloudwatch.PutMetricDataInput{

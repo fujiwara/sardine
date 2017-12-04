@@ -84,7 +84,7 @@ func (mp *MetricPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDa
 			for _, ds := range mp.Dimensions {
 				mds[ns] = append(mds[ns], metric.NewMetricDatum(ds))
 			}
-			// no dimention metric
+			// no dimension metric
 			mds[ns] = append(mds[ns], metric.NewMetricDatum(nil))
 		}
 		for ns, data := range mds {

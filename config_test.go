@@ -31,9 +31,9 @@ func TestLoadConfig(t *testing.T) {
 	}
 }
 
-func TestDimention(t *testing.T) {
+func TestDimension(t *testing.T) {
 	d := sardine.Dimension("Foo=bar,Bar=baz")
-	ds, err := d.CloudWatchDimentions()
+	ds, err := d.CloudWatchDimensions()
 	if err != nil {
 		t.Error(err)
 	}
@@ -42,11 +42,11 @@ func TestDimention(t *testing.T) {
 	}
 	n1, v1 := ds[0].Name, ds[0].Value
 	if *n1 != "Foo" || *v1 != "bar" {
-		t.Errorf("unexpected dimention[0] expected:Foo=bar got:%s=%s", *n1, *v1)
+		t.Errorf("unexpected dimension[0] expected:Foo=bar got:%s=%s", *n1, *v1)
 	}
 
 	n2, v2 := ds[1].Name, ds[1].Value
 	if *n2 != "Bar" || *v2 != "baz" {
-		t.Errorf("unexpected dimention[1] expected:Bar=baz got:%s=%s", *n2, *v2)
+		t.Errorf("unexpected dimension[1] expected:Bar=baz got:%s=%s", *n2, *v2)
 	}
 }

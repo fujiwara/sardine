@@ -9,7 +9,7 @@ Mackerel plugin metrics aggregator with CloudWatch.
 
 [plugin.metrics.memcached]
 command = "mackerel-plugin-memcached --host localhost --port 11211"
-dimentions = [
+dimensions = [
   "ClusterName=mycluster",
   "ClusterName=mycluster,AvailabilityZone=az-a"
 ] # "Name=Value[,Name=Value...]"
@@ -19,7 +19,7 @@ command = "...."
 
 [plugin.check.memcached]
 namespace = "memcahed/check" # required
-dimentions = ["ClusterName=mycluster"]
+dimensions = ["ClusterName=mycluster"]
 command = "memping -s localhost:11211"
 ```
 

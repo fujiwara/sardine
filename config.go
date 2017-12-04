@@ -26,12 +26,12 @@ type PluginConfig struct {
 
 type Dimension string
 
-func (d *Dimension) CloudWatchDimentions() ([]*cloudwatch.Dimension, error) {
+func (d *Dimension) CloudWatchDimensions() ([]*cloudwatch.Dimension, error) {
 	var ds []*cloudwatch.Dimension
 	for _, df := range strings.Split(string(*d), ",") {
 		cols := strings.SplitN(df, "=", 2)
 		if len(cols) != 2 {
-			return nil, fmt.Errorf("invalid dimention: %s", df)
+			return nil, fmt.Errorf("invalid dimension: %s", df)
 		}
 		ds = append(ds,
 			&cloudwatch.Dimension{
@@ -53,7 +53,7 @@ func (pc *PluginConfig) NewMetricPlugin(id string) (*MetricPlugin, error) {
 		Timeout: pc.Timeout,
 	}
 	for _, d := range pc.Dimensions {
-		if ds, err := d.CloudWatchDimentions(); err != nil {
+		if ds, err := d.CloudWatchDimensions(); err != nil {
 			return nil, err
 		} else {
 			mp.Dimensions = append(mp.Dimensions, ds)
@@ -80,7 +80,7 @@ func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
 		Timeout:   pc.Timeout,
 	}
 	for _, d := range pc.Dimensions {
-		if ds, err := d.CloudWatchDimentions(); err != nil {
+		if ds, err := d.CloudWatchDimensions(); err != nil {
 			return nil, err
 		} else {
 			cp.Dimensions = append(cp.Dimensions, ds)
