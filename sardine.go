@@ -11,6 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 )
 
+var Debug bool
+
 func Run(configPath string) error {
 	conf, err := LoadConfig(configPath)
 	if err != nil {
@@ -29,6 +31,10 @@ func Run(configPath string) error {
 		go mp.Run(ctx, ch)
 		time.Sleep(time.Second)
 	}
+	for _, cp := range conf.CheckPlugins {
+		go cp.Run(ctx, ch)
+		time.Sleep(time.Second)
+	}
 
 	wg.Wait()
 	return nil
@@ -43,7 +49,9 @@ func putToCloudWatch(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput
 		case <-ctx.Done():
 			return
 		case in := <-ch:
-			log.Println("put", in)
+			if Debug {
+				log.Println("put", in)
+			}
 			_, err := svc.PutMetricDataWithContext(ctx, in, request.WithResponseReadTimeout(30*time.Second))
 			if err != nil {
 				log.Println("putMetricData failed:", err)

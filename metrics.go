@@ -72,13 +72,13 @@ func parseMetricLine(b string) (*Metric, error) {
 
 func (mp *MetricPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
 	ticker := time.NewTicker(time.Minute)
-	log.Printf("[%s]: starting", mp.ID)
+	log.Printf("[%s] starting", mp.ID)
 	for {
 		metrics, err := mp.Execute(ctx)
 		if err != nil {
-			log.Printf("[%s]: %s", mp.ID, err)
+			log.Printf("[%s] %s", mp.ID, err)
 		}
-		mds := make(map[string][]*cloudwatch.MetricDatum)
+		mds := make(map[string][]*cloudwatch.MetricDatum, len(mp.Dimensions)+1)
 		for _, metric := range metrics {
 			ns := metric.Namespace
 			for _, ds := range mp.Dimensions {

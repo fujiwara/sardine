@@ -18,6 +18,17 @@ func TestLoadConfig(t *testing.T) {
 	if len(mp.Dimensions) != 2 {
 		t.Errorf("unexpected dimensions len expected:2 got:%d", len(mp.Dimensions))
 	}
+
+	cp := c.CheckPlugins["memcached"]
+	if cp.Command != "sh -c 'echo version | nc 127.0.0.1 11211'" {
+		t.Error("unexpected command", mp.Command)
+	}
+	if cp.Namespace != "memcached/check" {
+		t.Error("unexpected namespace", cp.Namespace)
+	}
+	if len(cp.Dimensions) != 0 {
+		t.Errorf("unexpected dimensions len expected:0 got:%d", len(cp.Dimensions))
+	}
 }
 
 func TestDimention(t *testing.T) {
