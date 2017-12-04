@@ -1,0 +1,12 @@
+sudo: false
+language: go
+
+go:
+  - 1.8
+  - 1.9
+  - tip
+
+install:
+  - make clean
+  - make get-deps
+  - make test
