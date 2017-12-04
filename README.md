@@ -35,28 +35,28 @@ AWS credentials for access to CloudWatch are read from environment variables or 
 
 sardine-agent works as below.
 
-1. Execute a `command` for each `[plugin.metrics.*]` sections.
-  - interval 60 sec.
+1. Execute `command` for each `[plugin.metrics.*]` sections.
+   - interval 60 sec.
 1. Put metrics got from command's output to CloudWatch metrics.
-  - e.g. `memcached.cmd.cmd_get  10.0  1512057958` put as
-    - Namespace: memcached/cmd
-    - MetricName: cmd_get
-    - Value: 10.0
-    - Timestamp: 2017-12-01T16:05:58Z
-1. Execute a `command` for each `[plugin.check.*]` sections.
-  - interval 60 sec.
+   - e.g. `memcached.cmd.cmd_get  10.0  1512057958` put as
+     - Namespace: memcached/cmd
+     - MetricName: cmd_get
+     - Value: 10.0
+     - Timestamp: 2017-12-01T16:05:58Z
+1. Execute `command` for each `[plugin.check.*]` sections.
+   - interval 60 sec.
 1. Put a command's result to CloudWatch metrics.
-  - e.g.
-    - Namespace: memcached/check
-    - MetricName: CheckFailed
-    - Value: 1
-    - Timestamp: 2017-12-01T16:05:58Z
-  - exit status of command maps to CloudWatch metric name as below
-    - 0 : CheckOK
-    - 1 : CheckFailed
-    - 2 : CheckWarning
-    - other : CheckUnknown
-  - metric Value is always 1
+   - e.g.
+     - Namespace: memcached/check
+     - MetricName: CheckFailed
+     - Value: 1
+     - Timestamp: 2017-12-01T16:05:58Z
+   - exit status of command maps to CloudWatch metric name as below
+     - 0 : CheckOK
+     - 1 : CheckFailed
+     - 2 : CheckWarning
+     - other : CheckUnknown
+   - metric Value is always 1
 
 ## Author
 
