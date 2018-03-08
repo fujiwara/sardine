@@ -17,10 +17,21 @@ type Config struct {
 	CheckPlugins  map[string]*CheckPlugin
 }
 
+type duration struct {
+	time.Duration
+}
+
+func (d *duration) UnmarshalText(text []byte) error {
+	var err error
+	d.Duration, err = time.ParseDuration(string(text))
+	return err
+}
+
 type PluginConfig struct {
 	Namespace  string
 	Command    string
-	Timeout    time.Duration
+	Timeout    duration
+	Interval   duration
 	Dimensions []*Dimension
 }
 
@@ -48,9 +59,10 @@ func (pc *PluginConfig) NewMetricPlugin(id string) (*MetricPlugin, error) {
 		return nil, errors.New("command required")
 	}
 	mp := &MetricPlugin{
-		ID:      fmt.Sprintf("plugin.metrics.%s", id),
-		Command: pc.Command,
-		Timeout: pc.Timeout,
+		ID:       fmt.Sprintf("plugin.metrics.%s", id),
+		Command:  pc.Command,
+		Timeout:  pc.Timeout.Duration,
+		Interval: pc.Interval.Duration,
 	}
 	for _, d := range pc.Dimensions {
 		if ds, err := d.CloudWatchDimensions(); err != nil {
@@ -60,7 +72,10 @@ func (pc *PluginConfig) NewMetricPlugin(id string) (*MetricPlugin, error) {
 		}
 	}
 	if mp.Timeout == 0 {
-		mp.Timeout = defaultCommandTimeout
+		mp.Timeout = DefaultCommandTimeout
+	}
+	if mp.Interval == 0 {
+		mp.Interval = DefaultInterval
 	}
 	return mp, nil
 }
@@ -77,7 +92,8 @@ func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
 		ID:        fmt.Sprintf("plugin.check.%s", id),
 		Namespace: pc.Namespace,
 		Command:   pc.Command,
-		Timeout:   pc.Timeout,
+		Timeout:   pc.Timeout.Duration,
+		Interval:  pc.Interval.Duration,
 	}
 	for _, d := range pc.Dimensions {
 		if ds, err := d.CloudWatchDimensions(); err != nil {
@@ -87,12 +103,13 @@ func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
 		}
 	}
 	if cp.Timeout == 0 {
-		cp.Timeout = defaultCommandTimeout
+		cp.Timeout = DefaultCommandTimeout
+	}
+	if cp.Interval == 0 {
+		cp.Interval = DefaultInterval
 	}
 	return cp, nil
 }
-
-var defaultCommandTimeout = 60 * time.Second
 
 func LoadConfig(path string) (*Config, error) {
 	c := Config{

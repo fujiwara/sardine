@@ -11,7 +11,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 )
 
-var Debug bool
+var (
+	Debug                 = false
+	DefaultInterval       = time.Minute
+	DefaultCommandTimeout = time.Minute
+)
 
 func Run(configPath string) error {
 	conf, err := LoadConfig(configPath)

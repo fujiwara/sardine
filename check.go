@@ -18,6 +18,7 @@ type CheckPlugin struct {
 	Namespace  string
 	Command    string
 	Timeout    time.Duration
+	Interval   time.Duration
 	Dimensions [][]*cloudwatch.Dimension
 }
 
@@ -41,7 +42,7 @@ func (r CheckResult) NewMetricDatum(ds []*cloudwatch.Dimension, ts time.Time) *c
 }
 
 func (cp *CheckPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
-	ticker := time.NewTicker(time.Minute)
+	ticker := time.NewTicker(cp.Interval)
 	log.Printf("[%s] starting", cp.ID)
 	now := time.Now()
 	for {

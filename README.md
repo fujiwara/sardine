@@ -13,6 +13,8 @@ dimensions = [
   "ClusterName=mycluster",
   "ClusterName=mycluster,AvailabilityZone=az-a"
 ] # "Name=Value[,Name=Value...]"
+interval = "10s"
+timeout  = "5s"
 
 [plugin.metrics.xxxx]
 command = "...."
@@ -36,7 +38,7 @@ AWS credentials for access to CloudWatch are read from environment variables or 
 sardine works as below.
 
 1. Execute `command` for each `[plugin.metrics.*]` sections.
-   - interval 60 sec.
+   - default interval 60 sec.
 1. Put metrics got from command's output to CloudWatch metrics.
    - e.g. `memcached.cmd.cmd_get  10.0  1512057958` put as
      - Namespace: memcached/cmd
@@ -44,7 +46,7 @@ sardine works as below.
      - Value: 10.0
      - Timestamp: 2017-12-01T16:05:58Z
 1. Execute `command` for each `[plugin.check.*]` sections.
-   - interval 60 sec.
+   - default interval 60 sec.
 1. Put a command's result to CloudWatch metrics.
    - e.g.
      - Namespace: memcached/check

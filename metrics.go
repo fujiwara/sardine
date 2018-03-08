@@ -20,6 +20,7 @@ type MetricPlugin struct {
 	ID         string
 	Command    string
 	Timeout    time.Duration
+	Interval   time.Duration
 	Dimensions [][]*cloudwatch.Dimension
 }
 
@@ -71,7 +72,7 @@ func parseMetricLine(b string) (*Metric, error) {
 }
 
 func (mp *MetricPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
-	ticker := time.NewTicker(time.Minute)
+	ticker := time.NewTicker(mp.Interval)
 	log.Printf("[%s] starting", mp.ID)
 	for {
 		metrics, err := mp.Execute(ctx)
