@@ -2,6 +2,7 @@ package sardine_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fujiwara/sardine"
 )
@@ -18,6 +19,12 @@ func TestLoadConfig(t *testing.T) {
 	if len(mp.Dimensions) != 2 {
 		t.Errorf("unexpected dimensions len expected:2 got:%d", len(mp.Dimensions))
 	}
+	if mp.Interval != 10*time.Second {
+		t.Errorf("unexpected interval expected:10s got:%s", mp.Interval)
+	}
+	if mp.Timeout != 15*time.Second {
+		t.Errorf("unexpected timeout expected:15s got:%s", mp.Timeout)
+	}
 
 	cp := c.CheckPlugins["memcached"]
 	if cp.Command != "sh -c 'echo version | nc 127.0.0.1 11211'" {
@@ -28,6 +35,12 @@ func TestLoadConfig(t *testing.T) {
 	}
 	if len(cp.Dimensions) != 0 {
 		t.Errorf("unexpected dimensions len expected:0 got:%d", len(cp.Dimensions))
+	}
+	if cp.Interval != time.Minute {
+		t.Errorf("unexpected interval expected:1m got:%s", cp.Interval)
+	}
+	if cp.Timeout != time.Minute {
+		t.Errorf("unexpected timeout expected:1m got:%s", cp.Timeout)
 	}
 }
 
