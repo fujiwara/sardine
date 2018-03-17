@@ -12,6 +12,7 @@ func TestLoadConfig(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
 	mp := c.MetricPlugins["memcached"]
 	if mp.Command != "mackerel-plugin-memcached --host 127.0.0.1 --port 11211" {
 		t.Error("unexpected command", mp.Command)

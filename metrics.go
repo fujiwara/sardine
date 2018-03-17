@@ -12,19 +12,30 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/mackerelio/mackerel-agent/config"
+	"github.com/mackerelio/mackerel-agent/metrics"
+	"github.com/mackerelio/mackerel-client-go"
 	shellwords "github.com/mattn/go-shellwords"
 	"github.com/pkg/errors"
 )
 
+const (
+	PluginPrefix = "custom."
+)
+
 type MetricPlugin struct {
-	ID         string
-	Command    string
-	Timeout    time.Duration
-	Interval   time.Duration
-	Dimensions [][]*cloudwatch.Dimension
+	ID               string
+	Command          string
+	Timeout          time.Duration
+	Interval         time.Duration
+	Dimensions       [][]*cloudwatch.Dimension
+	HostID           string
+	CustomIdentifier string
+	Metrics          []*Metric
 }
 
 type Metric struct {
+	HostID    string
 	Namespace string
 	Name      string
 	Value     float64
@@ -40,7 +51,17 @@ func (m *Metric) NewMetricDatum(ds []*cloudwatch.Dimension) *cloudwatch.MetricDa
 	}
 }
 
-func parseMetricLine(b string) (*Metric, error) {
+func (m *Metric) NewMackerelMetric() *mackerel.HostMetricValue {
+	return &mackerel.HostMetricValue{
+		MetricValue: &mackerel.MetricValue{
+			Name:  m.Name,
+			Time:  m.Timestamp.Unix(),
+			Value: m.Value,
+		},
+	}
+}
+
+func metricLineParser(b string) (*Metric, error) {
 	cols := strings.SplitN(b, "\t", 3)
 	if len(cols) < 3 {
 		return nil, errors.New("invalid metric format. insufficient columns")
@@ -71,16 +92,41 @@ func parseMetricLine(b string) (*Metric, error) {
 	return &m, nil
 }
 
+func mackerelMetricParser(b string) (*Metric, error) {
+	cols := strings.SplitN(b, "\t", 3)
+	if len(cols) < 3 {
+		return nil, errors.New("invalid metric format. insufficient columns")
+	}
+
+	name, value, timestamp := cols[0], cols[1], cols[2]
+	var m Metric
+	m.Name = PluginPrefix + name
+
+	if v, err := strconv.ParseFloat(value, 64); err != nil {
+		return nil, fmt.Errorf("invalid metric value: %s", value)
+	} else {
+		m.Value = v
+	}
+
+	if ts, err := strconv.ParseInt(timestamp, 10, 64); err != nil {
+		return nil, fmt.Errorf("invalid metric time: %s", timestamp)
+	} else {
+		m.Timestamp = time.Unix(ts, 0)
+	}
+
+	return &m, nil
+}
+
 func (mp *MetricPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
 	ticker := time.NewTicker(mp.Interval)
 	log.Printf("[%s] starting", mp.ID)
 	for {
-		metrics, err := mp.Execute(ctx)
+		err := mp.Execute(ctx, metricLineParser)
 		if err != nil {
 			log.Printf("[%s] %s", mp.ID, err)
 		}
 		mds := make(map[string][]*cloudwatch.MetricDatum, len(mp.Dimensions)+1)
-		for _, metric := range metrics {
+		for _, metric := range mp.Metrics {
 			ns := metric.Namespace
 			for _, ds := range mp.Dimensions {
 				mds[ns] = append(mds[ns], metric.NewMetricDatum(ds))
@@ -104,10 +150,36 @@ func (mp *MetricPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDa
 	}
 }
 
-func (mp *MetricPlugin) Execute(_ctx context.Context) ([]*Metric, error) {
+func (mp *MetricPlugin) RunForMackerel(ctx context.Context, ch chan []*mackerel.HostMetricValue) {
+	ticker := time.NewTicker(mp.Interval)
+	log.Printf("[%s] starting", mp.ID)
+	for {
+		err := mp.Execute(ctx, mackerelMetricParser)
+		if err != nil {
+			log.Printf("[%s] %s", mp.ID, err)
+		}
+
+		ms := []*mackerel.HostMetricValue{}
+		for _, metric := range mp.Metrics {
+			m := metric.NewMackerelMetric()
+			m.HostID = mp.HostID
+			ms = append(ms, m)
+		}
+
+		ch <- ms
+
+		select {
+		case <-ticker.C:
+			continue
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (mp *MetricPlugin) Execute(_ctx context.Context, parser func(b string) (*Metric, error)) error {
 	var (
-		err     error
-		metrics []*Metric
+		err error
 	)
 
 	ctx, cancel := context.WithTimeout(_ctx, mp.Timeout)
@@ -115,34 +187,54 @@ func (mp *MetricPlugin) Execute(_ctx context.Context) ([]*Metric, error) {
 
 	args, err := shellwords.Parse(mp.Command)
 	if err != nil {
-		return nil, errors.Wrap(err, "parse command failed")
+		return errors.Wrap(err, "parse command failed")
 	}
 
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "stdout open failed")
+		return errors.Wrap(err, "stdout open failed")
 	}
 	scanner := bufio.NewScanner(stdout)
 
 	if err := cmd.Start(); err != nil {
-		return nil, errors.Wrap(err, "command execute failed1")
+		return errors.Wrap(err, "command execute failed1")
 	}
 
 	for scanner.Scan() {
-		m, err := parseMetricLine(scanner.Text())
+		m, err := parser(scanner.Text())
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		metrics = append(metrics, m)
+		mp.Metrics = append(mp.Metrics, m)
 	}
 
 	err = cmd.Wait()
 	if e, ok := err.(*exec.ExitError); ok {
-		return nil, errors.Wrap(e, "command execute failed")
+		return errors.Wrap(e, "command execute failed")
 	}
 
-	return metrics, err
+	return err
+}
+
+func (mp *MetricPlugin) GraphDef() (interface{}, error) {
+	cmd, err := shellwords.Parse(mp.Command)
+	if err != nil {
+		return nil, errors.Wrap(err, "command parse failed")
+	}
+
+	pc := &config.MetricPlugin{
+		Command: config.Command{
+			Args: cmd,
+		},
+		CustomIdentifier: &mp.CustomIdentifier,
+	}
+	payload, err := metrics.NewPluginGenerator(pc).PrepareGraphDefs()
+	if err != nil {
+		return nil, errors.Wrap(err, "parse graph defs failed")
+	}
+
+	return payload, nil
 }

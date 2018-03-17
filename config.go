@@ -1,20 +1,54 @@
 package sardine
 
 import (
-	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/k0kubun/pp"
 	config "github.com/kayac/go-config"
+	mc "github.com/mackerelio/mackerel-agent/config"
+	mackerel "github.com/mackerelio/mackerel-client-go"
+	"github.com/pkg/errors"
 )
 
 type Config struct {
-	Plugin        map[string]map[string]*PluginConfig
-	MetricPlugins map[string]*MetricPlugin
-	CheckPlugins  map[string]*CheckPlugin
+	hostID                string
+	APIKey                string
+	Plugin                map[string]map[string]*PluginConfig
+	MetricPlugins         map[string]*MetricPlugin
+	CheckPlugins          map[string]*CheckPlugin
+	MackerelMetricPlugins map[string]*MetricPlugin
+	CustomIdentifierList  sync.Map
+	MackerelClient        *mackerel.Client
+}
+
+func (c *Config) GetHostIDByCustomIdentifier(customIdentifier string) (string, error) {
+	if ci, ok := c.CustomIdentifierList.Load(customIdentifier); ok {
+		return ci.(string), nil
+	}
+
+	hosts, err := c.MackerelClient.FindHosts(&mackerel.FindHostsParam{
+		CustomIdentifier: customIdentifier,
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "FindHosts failed.")
+	}
+	if len(hosts) == 0 {
+		return "", errors.New(fmt.Sprint("No such host. custom_identifier=", customIdentifier))
+	}
+	if len(hosts) > 1 {
+		return "", errors.New(fmt.Sprint("Ambiguous custom_identifier. Found host must be 1. custom_identifier=", customIdentifier,
+			"found host=", hosts))
+	}
+
+	hostID := hosts[0].ID
+	c.CustomIdentifierList.Store(customIdentifier, hostID)
+
+	return hostID, nil
 }
 
 type duration struct {
@@ -28,11 +62,12 @@ func (d *duration) UnmarshalText(text []byte) error {
 }
 
 type PluginConfig struct {
-	Namespace  string
-	Command    string
-	Timeout    duration
-	Interval   duration
-	Dimensions []*Dimension
+	Namespace        string
+	Command          string
+	Timeout          duration
+	Interval         duration
+	Dimensions       []*Dimension
+	CustomIdentifier string `toml:"custom_identifier"`
 }
 
 type Dimension string
@@ -80,6 +115,52 @@ func (pc *PluginConfig) NewMetricPlugin(id string) (*MetricPlugin, error) {
 	return mp, nil
 }
 
+func (pc *PluginConfig) NewMackerelMetricPlugin(conf *Config, id string) (*MetricPlugin, error) {
+	if pc.Command == "" {
+		return nil, errors.New("command required")
+	}
+	mp := &MetricPlugin{
+		ID:               fmt.Sprintf("plugin.metrics.%s", id),
+		Command:          pc.Command,
+		Timeout:          pc.Timeout.Duration,
+		Interval:         pc.Interval.Duration,
+		HostID:           conf.hostID,
+		CustomIdentifier: pc.CustomIdentifier,
+	}
+	if mp.Timeout == 0 {
+		mp.Timeout = DefaultCommandTimeout
+	}
+	if mp.Interval == 0 {
+		mp.Interval = DefaultInterval
+	}
+	if pc.CustomIdentifier != "" {
+		var err error
+		mp.HostID, err = conf.GetHostIDByCustomIdentifier(pc.CustomIdentifier)
+		if err != nil {
+			return nil, errors.Wrap(err, "")
+		}
+	}
+	if mp.HostID == "" {
+		return nil, errors.New("no hostid.")
+	}
+
+	graphDef, err := mp.GraphDef()
+	if err != nil {
+		return nil, errors.Wrap(err, "create graphdefinition failed")
+	}
+	if Debug {
+		pp.Println(graphDef)
+	}
+
+	r, err := conf.MackerelClient.PostJSON("/api/v0/graph-defs/create", graphDef)
+	if err != nil {
+		return nil, errors.Wrap(err, "post graphdefinition failed")
+	}
+	defer r.Body.Close()
+
+	return mp, nil
+}
+
 func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
 	if pc.Namespace == "" {
 		return nil, errors.New("namespace required")
@@ -112,13 +193,28 @@ func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
 }
 
 func LoadConfig(path string) (*Config, error) {
-	c := Config{
-		MetricPlugins: make(map[string]*MetricPlugin),
-		CheckPlugins:  make(map[string]*CheckPlugin),
+	c := &Config{
+		MetricPlugins:         make(map[string]*MetricPlugin),
+		CheckPlugins:          make(map[string]*CheckPlugin),
+		MackerelMetricPlugins: make(map[string]*MetricPlugin),
 	}
+
 	if err := config.LoadWithEnvTOML(&c, path); err != nil {
 		return nil, err
 	}
+
+	if c.APIKey != "" {
+		hostID, err := mc.DefaultConfig.LoadHostID()
+		if err != nil {
+			return c, errors.Wrap(err, "failed load host id")
+		}
+		if hostID != "" {
+			c.hostID = hostID
+		}
+
+		c.MackerelClient = mackerel.NewClient(c.APIKey)
+	}
+
 	for key, value := range c.Plugin {
 		switch key {
 		case "metrics":
@@ -137,10 +233,19 @@ func LoadConfig(path string) (*Config, error) {
 				}
 				c.CheckPlugins[id] = cp
 			}
+		case "mackerelmetrics":
+			for id, pc := range value {
+				mmp, err := pc.NewMackerelMetricPlugin(c, id)
+				if err != nil {
+					return nil, err
+				}
+				c.MackerelMetricPlugins[id] = mmp
+			}
 		default:
 			return nil, fmt.Errorf("unknown config section [plugin.%s]", key)
 		}
 	}
 	c.Plugin = nil
-	return &c, nil
+
+	return c, nil
 }
