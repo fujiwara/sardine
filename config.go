@@ -121,7 +121,7 @@ func (pc *PluginConfig) NewMackerelMetricPlugin(conf *Config, id string) (*Metri
 		return nil, errors.New("command required")
 	}
 	mp := &MetricPlugin{
-		ID:               fmt.Sprintf("plugin.metrics.%s", id),
+		ID:               fmt.Sprintf("plugin.mackerelmetrics.%s", id),
 		Command:          pc.Command,
 		Timeout:          pc.Timeout.Duration,
 		Interval:         pc.Interval.Duration,
