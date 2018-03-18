@@ -94,10 +94,11 @@ func (pc *PluginConfig) NewMetricPlugin(id string) (*MetricPlugin, error) {
 		return nil, errors.New("command required")
 	}
 	mp := &MetricPlugin{
-		ID:       fmt.Sprintf("plugin.metrics.%s", id),
-		Command:  pc.Command,
-		Timeout:  pc.Timeout.Duration,
-		Interval: pc.Interval.Duration,
+		ID:           fmt.Sprintf("plugin.metrics.%s", id),
+		Command:      pc.Command,
+		Timeout:      pc.Timeout.Duration,
+		Interval:     pc.Interval.Duration,
+		MetricParser: metricLineParser,
 	}
 	for _, d := range pc.Dimensions {
 		if ds, err := d.CloudWatchDimensions(); err != nil {
@@ -126,6 +127,7 @@ func (pc *PluginConfig) NewMackerelMetricPlugin(conf *Config, id string) (*Metri
 		Interval:         pc.Interval.Duration,
 		HostID:           conf.hostID,
 		CustomIdentifier: pc.CustomIdentifier,
+		MetricParser:     mackerelMetricParser,
 	}
 	if mp.Timeout == 0 {
 		mp.Timeout = DefaultCommandTimeout

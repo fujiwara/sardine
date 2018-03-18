@@ -31,7 +31,7 @@ type MetricPlugin struct {
 	Dimensions       [][]*cloudwatch.Dimension
 	HostID           string
 	CustomIdentifier string
-	Metrics          []*Metric
+	MetricParser     func(string) (*Metric, error)
 }
 
 type Metric struct {
@@ -121,12 +121,12 @@ func (mp *MetricPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDa
 	ticker := time.NewTicker(mp.Interval)
 	log.Printf("[%s] starting", mp.ID)
 	for {
-		err := mp.Execute(ctx, metricLineParser)
+		metrics, err := mp.Execute(ctx)
 		if err != nil {
 			log.Printf("[%s] %s", mp.ID, err)
 		}
 		mds := make(map[string][]*cloudwatch.MetricDatum, len(mp.Dimensions)+1)
-		for _, metric := range mp.Metrics {
+		for _, metric := range metrics {
 			ns := metric.Namespace
 			for _, ds := range mp.Dimensions {
 				mds[ns] = append(mds[ns], metric.NewMetricDatum(ds))
@@ -154,13 +154,13 @@ func (mp *MetricPlugin) RunForMackerel(ctx context.Context, ch chan []*mackerel.
 	ticker := time.NewTicker(mp.Interval)
 	log.Printf("[%s] starting", mp.ID)
 	for {
-		err := mp.Execute(ctx, mackerelMetricParser)
+		metrics, err := mp.Execute(ctx)
 		if err != nil {
 			log.Printf("[%s] %s", mp.ID, err)
 		}
 
 		ms := []*mackerel.HostMetricValue{}
-		for _, metric := range mp.Metrics {
+		for _, metric := range metrics {
 			m := metric.NewMackerelMetric()
 			m.HostID = mp.HostID
 			ms = append(ms, m)
@@ -177,9 +177,10 @@ func (mp *MetricPlugin) RunForMackerel(ctx context.Context, ch chan []*mackerel.
 	}
 }
 
-func (mp *MetricPlugin) Execute(_ctx context.Context, parser func(b string) (*Metric, error)) error {
+func (mp *MetricPlugin) Execute(_ctx context.Context) ([]*Metric, error) {
 	var (
-		err error
+		err     error
+		metrics []*Metric
 	)
 
 	ctx, cancel := context.WithTimeout(_ctx, mp.Timeout)
@@ -187,36 +188,36 @@ func (mp *MetricPlugin) Execute(_ctx context.Context, parser func(b string) (*Me
 
 	args, err := shellwords.Parse(mp.Command)
 	if err != nil {
-		return errors.Wrap(err, "parse command failed")
+		return nil, errors.Wrap(err, "parse command failed")
 	}
 
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return errors.Wrap(err, "stdout open failed")
+		return nil, errors.Wrap(err, "stdout open failed")
 	}
 	scanner := bufio.NewScanner(stdout)
 
 	if err := cmd.Start(); err != nil {
-		return errors.Wrap(err, "command execute failed1")
+		return nil, errors.Wrap(err, "command execute failed1")
 	}
 
 	for scanner.Scan() {
-		m, err := parser(scanner.Text())
+		m, err := mp.MetricParser(scanner.Text())
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		mp.Metrics = append(mp.Metrics, m)
+		metrics = append(metrics, m)
 	}
 
 	err = cmd.Wait()
 	if e, ok := err.(*exec.ExitError); ok {
-		return errors.Wrap(e, "command execute failed")
+		return nil, errors.Wrap(e, "command execute failed")
 	}
 
-	return err
+	return metrics, err
 }
 
 func (mp *MetricPlugin) GraphDef() (interface{}, error) {
