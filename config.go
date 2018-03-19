@@ -206,6 +206,7 @@ func LoadConfig(path string, ch chan *cloudwatch.PutMetricDataInput, mch chan []
 	}
 
 	if c.APIKey != "" {
+		var err error
 		if c.hostID, err = mc.DefaultConfig.LoadHostID(); err != nil {
 			log.Println("failed LoadHostID:", err)
 		}
