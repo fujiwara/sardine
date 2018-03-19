@@ -22,7 +22,6 @@ var (
 func Run(configPath string) error {
 	ch := make(chan *cloudwatch.PutMetricDataInput, 1000)
 	mch := make(chan []*mackerel.HostMetricValue, 1000)
-
 	conf, err := LoadConfig(configPath, ch, mch)
 	if err != nil {
 		return err
