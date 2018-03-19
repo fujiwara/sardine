@@ -24,7 +24,7 @@ func TestLoadConfig(t *testing.T) {
 	}
 	if driver, ok := (mp.PluginDriver).(*sardine.CloudWatchDriver); ok {
 		if len(driver.Dimensions) != 2 {
-			t.Errorf("unexpected dimensions len expected:2 got:%d", len(mp.Dimensions))
+			t.Errorf("unexpected dimensions len expected:2 got:%d", len(driver.Dimensions))
 		}
 	} else {
 		t.Errorf("failed assertion: mp.PluginDriver expected *sardine.CloudWatchDriver")
