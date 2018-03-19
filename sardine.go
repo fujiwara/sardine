@@ -20,7 +20,10 @@ var (
 )
 
 func Run(configPath string) error {
-	conf, err := LoadConfig(configPath)
+	ch := make(chan *cloudwatch.PutMetricDataInput, 1000)
+	mch := make(chan []*mackerel.HostMetricValue, 1000)
+
+	conf, err := LoadConfig(configPath, ch, mch)
 	if err != nil {
 		return err
 	}
@@ -30,21 +33,15 @@ func Run(configPath string) error {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	ch := make(chan *cloudwatch.PutMetricDataInput, 1000)
-	mch := make(chan []*mackerel.HostMetricValue, 1000)
 	go putToCloudWatch(ctx, ch)
 	go putToMackerel(ctx, conf, mch)
 
 	for _, mp := range conf.MetricPlugins {
-		go mp.Run(ctx, ch)
+		go mp.Run(ctx)
 		time.Sleep(time.Second)
 	}
 	for _, cp := range conf.CheckPlugins {
 		go cp.Run(ctx, ch)
-		time.Sleep(time.Second)
-	}
-	for _, mp := range conf.MackerelMetricPlugins {
-		go mp.RunForMackerel(ctx, mch)
 		time.Sleep(time.Second)
 	}
 

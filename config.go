@@ -16,14 +16,13 @@ import (
 )
 
 type Config struct {
-	hostID                string
-	APIKey                string
-	Plugin                map[string]map[string]*PluginConfig
-	MetricPlugins         map[string]*MetricPlugin
-	CheckPlugins          map[string]*CheckPlugin
-	MackerelMetricPlugins map[string]*MetricPlugin
-	CustomIdentifierList  sync.Map
-	MackerelClient        *mackerel.Client
+	hostID               string
+	APIKey               string
+	Plugin               map[string]map[string]*PluginConfig
+	MetricPlugins        map[string]*MetricPlugin
+	CheckPlugins         map[string]*CheckPlugin
+	CustomIdentifierList sync.Map
+	MackerelClient       *mackerel.Client
 }
 
 func (c *Config) GetHostIDByCustomIdentifier(customIdentifier string) (string, error) {
@@ -89,23 +88,24 @@ func (d *Dimension) CloudWatchDimensions() ([]*cloudwatch.Dimension, error) {
 	return ds, nil
 }
 
-func (pc *PluginConfig) NewMetricPlugin(id string) (*MetricPlugin, error) {
+func (pc *PluginConfig) NewMetricPlugin(id string, ch chan *cloudwatch.PutMetricDataInput) (*MetricPlugin, error) {
 	if pc.Command == "" {
 		return nil, errors.New("command required")
+	}
+	driver := CloudWatchDriver{Ch: ch}
+	for _, d := range pc.Dimensions {
+		if ds, err := d.CloudWatchDimensions(); err != nil {
+			return nil, err
+		} else {
+			driver.Dimensions = append(driver.Dimensions, ds)
+		}
 	}
 	mp := &MetricPlugin{
 		ID:           fmt.Sprintf("plugin.metrics.%s", id),
 		Command:      pc.Command,
 		Timeout:      pc.Timeout.Duration,
 		Interval:     pc.Interval.Duration,
-		MetricParser: metricLineParser,
-	}
-	for _, d := range pc.Dimensions {
-		if ds, err := d.CloudWatchDimensions(); err != nil {
-			return nil, err
-		} else {
-			mp.Dimensions = append(mp.Dimensions, ds)
-		}
+		PluginDriver: &driver,
 	}
 	if mp.Timeout == 0 {
 		mp.Timeout = DefaultCommandTimeout
@@ -116,34 +116,34 @@ func (pc *PluginConfig) NewMetricPlugin(id string) (*MetricPlugin, error) {
 	return mp, nil
 }
 
-func (pc *PluginConfig) NewMackerelMetricPlugin(conf *Config, id string) (*MetricPlugin, error) {
+func (pc *PluginConfig) NewMackerelMetricPlugin(conf *Config, id string, ch chan []*mackerel.HostMetricValue) (*MetricPlugin, error) {
 	if pc.Command == "" {
 		return nil, errors.New("command required")
 	}
+	hostID := conf.hostID
+	if pc.CustomIdentifier != "" {
+		var err error
+		hostID, err = conf.GetHostIDByCustomIdentifier(pc.CustomIdentifier)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed GetHostIDByCustomIdentifier")
+		}
+	}
+	if hostID == "" {
+		return nil, errors.New("no hostid.")
+	}
+
 	mp := &MetricPlugin{
-		ID:               fmt.Sprintf("plugin.mackerelmetrics.%s", id),
-		Command:          pc.Command,
-		Timeout:          pc.Timeout.Duration,
-		Interval:         pc.Interval.Duration,
-		HostID:           conf.hostID,
-		CustomIdentifier: pc.CustomIdentifier,
-		MetricParser:     mackerelMetlicLineParser,
+		ID:           fmt.Sprintf("plugin.mackerelmetrics.%s", id),
+		Command:      pc.Command,
+		Timeout:      pc.Timeout.Duration,
+		Interval:     pc.Interval.Duration,
+		PluginDriver: &MackerelDriver{HostID: hostID, Ch: ch},
 	}
 	if mp.Timeout == 0 {
 		mp.Timeout = DefaultCommandTimeout
 	}
 	if mp.Interval == 0 {
 		mp.Interval = DefaultInterval
-	}
-	if pc.CustomIdentifier != "" {
-		var err error
-		mp.HostID, err = conf.GetHostIDByCustomIdentifier(pc.CustomIdentifier)
-		if err != nil {
-			return nil, errors.Wrap(err, "")
-		}
-	}
-	if mp.HostID == "" {
-		return nil, errors.New("no hostid.")
 	}
 
 	graphDef, err := mp.GraphDef()
@@ -194,11 +194,10 @@ func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
 	return cp, nil
 }
 
-func LoadConfig(path string) (*Config, error) {
+func LoadConfig(path string, ch chan *cloudwatch.PutMetricDataInput, mch chan []*mackerel.HostMetricValue) (*Config, error) {
 	c := &Config{
-		MetricPlugins:         make(map[string]*MetricPlugin),
-		CheckPlugins:          make(map[string]*CheckPlugin),
-		MackerelMetricPlugins: make(map[string]*MetricPlugin),
+		MetricPlugins: make(map[string]*MetricPlugin),
+		CheckPlugins:  make(map[string]*CheckPlugin),
 	}
 
 	if err := config.LoadWithEnvTOML(&c, path); err != nil {
@@ -221,7 +220,7 @@ func LoadConfig(path string) (*Config, error) {
 		switch key {
 		case "metrics":
 			for id, pc := range value {
-				mp, err := pc.NewMetricPlugin(id)
+				mp, err := pc.NewMetricPlugin(id, ch)
 				if err != nil {
 					return nil, err
 				}
@@ -237,11 +236,11 @@ func LoadConfig(path string) (*Config, error) {
 			}
 		case "mackerelmetrics":
 			for id, pc := range value {
-				mmp, err := pc.NewMackerelMetricPlugin(c, id)
+				mmp, err := pc.NewMackerelMetricPlugin(c, id, mch)
 				if err != nil {
 					return nil, err
 				}
-				c.MackerelMetricPlugins[id] = mmp
+				c.MetricPlugins[id] = mmp
 			}
 		default:
 			return nil, fmt.Errorf("unknown config section [plugin.%s]", key)

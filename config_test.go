@@ -4,11 +4,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/fujiwara/sardine"
+	mackerel "github.com/mackerelio/mackerel-client-go"
 )
 
 func TestLoadConfig(t *testing.T) {
-	c, err := sardine.LoadConfig("test/config.toml")
+	c, err := sardine.LoadConfig("test/config.toml", make(chan *cloudwatch.PutMetricDataInput, 1000), make(chan []*mackerel.HostMetricValue, 1000))
 	if err != nil {
 		t.Error(err)
 	}
@@ -17,8 +19,12 @@ func TestLoadConfig(t *testing.T) {
 	if mp.Command != "mackerel-plugin-memcached --host 127.0.0.1 --port 11211" {
 		t.Error("unexpected command", mp.Command)
 	}
-	if len(mp.Dimensions) != 2 {
-		t.Errorf("unexpected dimensions len expected:2 got:%d", len(mp.Dimensions))
+	if driver, ok := (mp.PluginDriver).(*sardine.CloudWatchDriver); ok {
+		if len(driver.Dimensions) != 2 {
+			t.Errorf("unexpected dimensions len expected:2 got:%d", len(mp.Dimensions))
+		}
+	} else {
+		t.Errorf("failed assertion: mp.PluginDriver expected *sardine.CloudWatchDriver")
 	}
 	if mp.Interval != 10*time.Second {
 		t.Errorf("unexpected interval expected:10s got:%s", mp.Interval)
