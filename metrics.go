@@ -126,10 +126,10 @@ type MackerelDriver struct {
 func (md *MackerelDriver) enqueue(metrics []*Metric) {
 	ms := []*mackerel.HostMetricValue{}
 	for _, metric := range metrics {
-		m := metric.NewMackerelMetric(me.HostID)
+		m := metric.NewMackerelMetric(md.HostID)
 		ms = append(ms, m)
 	}
-	me.Ch <- ms
+	md.Ch <- ms
 }
 
 func (md *MackerelDriver) parseMetricLine(b string) (*Metric, error) {
