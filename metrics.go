@@ -65,8 +65,8 @@ type PluginDriver interface {
 }
 
 type CloudWatchDriver struct {
-	Ch         chan *cloudwatch.PutMetricDataInput
 	Dimensions [][]*cloudwatch.Dimension
+	Ch         chan *cloudwatch.PutMetricDataInput
 }
 
 func (cd *CloudWatchDriver) enqueue(metrics []*Metric) {
@@ -119,8 +119,8 @@ func (cd *CloudWatchDriver) parseMetricLine(b string) (*Metric, error) {
 }
 
 type MackerelDriver struct {
-	Ch     chan []*mackerel.HostMetricValue
 	HostID string
+	Ch     chan []*mackerel.HostMetricValue
 }
 
 func (md *MackerelDriver) enqueue(metrics []*Metric) {

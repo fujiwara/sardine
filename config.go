@@ -92,12 +92,12 @@ func (pc *PluginConfig) NewMetricPlugin(id string, ch chan *cloudwatch.PutMetric
 	if pc.Command == "" {
 		return nil, errors.New("command required")
 	}
-	driver := CloudWatchDriver{Ch: ch}
+	dimensions := [][]*cloudwatch.Dimension{}
 	for _, d := range pc.Dimensions {
 		if ds, err := d.CloudWatchDimensions(); err != nil {
 			return nil, err
 		} else {
-			driver.Dimensions = append(driver.Dimensions, ds)
+			dimensions = append(dimensions, ds)
 		}
 	}
 	mp := &MetricPlugin{
@@ -105,7 +105,7 @@ func (pc *PluginConfig) NewMetricPlugin(id string, ch chan *cloudwatch.PutMetric
 		Command:      pc.Command,
 		Timeout:      pc.Timeout.Duration,
 		Interval:     pc.Interval.Duration,
-		PluginDriver: &driver,
+		PluginDriver: &CloudWatchDriver{Dimensions: dimensions, Ch: ch},
 	}
 	if mp.Timeout == 0 {
 		mp.Timeout = DefaultCommandTimeout
