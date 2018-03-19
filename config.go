@@ -2,6 +2,7 @@ package sardine
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -205,14 +206,9 @@ func LoadConfig(path string, ch chan *cloudwatch.PutMetricDataInput, mch chan []
 	}
 
 	if c.APIKey != "" {
-		hostID, err := mc.DefaultConfig.LoadHostID()
-		if err != nil {
-			return c, errors.Wrap(err, "failed load host id")
+		if c.hostID, err = mc.DefaultConfig.LoadHostID(); err != nil {
+			log.Println("failed LoadHostID:", err)
 		}
-		if hostID != "" {
-			c.hostID = hostID
-		}
-
 		c.MackerelClient = mackerel.NewClient(c.APIKey)
 	}
 
