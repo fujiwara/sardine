@@ -28,7 +28,6 @@ type MetricPlugin struct {
 	Command      string
 	Timeout      time.Duration
 	Interval     time.Duration
-	Dimensions   [][]*cloudwatch.Dimension
 	PluginDriver PluginDriver
 }
 
