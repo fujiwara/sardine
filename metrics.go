@@ -92,7 +92,7 @@ func metricLineParser(b string) (*Metric, error) {
 	return &m, nil
 }
 
-func mackerelMetricParser(b string) (*Metric, error) {
+func mackerelMetlicLineParser(b string) (*Metric, error) {
 	cols := strings.SplitN(b, "\t", 3)
 	if len(cols) < 3 {
 		return nil, errors.New("invalid metric format. insufficient columns")

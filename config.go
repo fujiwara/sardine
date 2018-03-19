@@ -127,7 +127,7 @@ func (pc *PluginConfig) NewMackerelMetricPlugin(conf *Config, id string) (*Metri
 		Interval:         pc.Interval.Duration,
 		HostID:           conf.hostID,
 		CustomIdentifier: pc.CustomIdentifier,
-		MetricParser:     mackerelMetricParser,
+		MetricParser:     mackerelMetlicLineParser,
 	}
 	if mp.Timeout == 0 {
 		mp.Timeout = DefaultCommandTimeout
