@@ -12,15 +12,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
-	"github.com/mackerelio/mackerel-agent/config"
-	"github.com/mackerelio/mackerel-agent/metrics"
-	"github.com/mackerelio/mackerel-client-go"
 	shellwords "github.com/mattn/go-shellwords"
 	"github.com/pkg/errors"
-)
-
-const (
-	PluginPrefix = "custom."
 )
 
 type MetricPlugin struct {
@@ -44,17 +37,6 @@ func (m *Metric) NewMetricDatum(ds []*cloudwatch.Dimension) *cloudwatch.MetricDa
 		Value:      &m.Value,
 		Timestamp:  &m.Timestamp,
 		Dimensions: ds,
-	}
-}
-
-func (m *Metric) NewMackerelMetric(hostID string) *mackerel.HostMetricValue {
-	return &mackerel.HostMetricValue{
-		HostID: hostID,
-		MetricValue: &mackerel.MetricValue{
-			Name:  m.Name,
-			Time:  m.Timestamp.Unix(),
-			Value: m.Value,
-		},
 	}
 }
 
@@ -101,45 +83,6 @@ func (cd *CloudWatchDriver) parseMetricLine(b string) (*Metric, error) {
 		m.Namespace = ns[0] + "/" + ns[1]
 		m.Name = ns[2]
 	}
-
-	if v, err := strconv.ParseFloat(value, 64); err != nil {
-		return nil, fmt.Errorf("invalid metric value: %s", value)
-	} else {
-		m.Value = v
-	}
-
-	if ts, err := strconv.ParseInt(timestamp, 10, 64); err != nil {
-		return nil, fmt.Errorf("invalid metric time: %s", timestamp)
-	} else {
-		m.Timestamp = time.Unix(ts, 0)
-	}
-
-	return &m, nil
-}
-
-type MackerelDriver struct {
-	HostID string
-	Ch     chan []*mackerel.HostMetricValue
-}
-
-func (md *MackerelDriver) enqueue(metrics []*Metric) {
-	ms := []*mackerel.HostMetricValue{}
-	for _, metric := range metrics {
-		m := metric.NewMackerelMetric(md.HostID)
-		ms = append(ms, m)
-	}
-	md.Ch <- ms
-}
-
-func (md *MackerelDriver) parseMetricLine(b string) (*Metric, error) {
-	cols := strings.SplitN(b, "\t", 3)
-	if len(cols) < 3 {
-		return nil, errors.New("invalid metric format. insufficient columns")
-	}
-
-	name, value, timestamp := cols[0], cols[1], cols[2]
-	var m Metric
-	m.Name = PluginPrefix + name
 
 	if v, err := strconv.ParseFloat(value, 64); err != nil {
 		return nil, fmt.Errorf("invalid metric value: %s", value)
@@ -217,23 +160,4 @@ func (mp *MetricPlugin) Execute(_ctx context.Context) ([]*Metric, error) {
 	}
 
 	return metrics, err
-}
-
-func (mp *MetricPlugin) GraphDef() (interface{}, error) {
-	cmd, err := shellwords.Parse(mp.Command)
-	if err != nil {
-		return nil, errors.Wrap(err, "command parse failed")
-	}
-
-	pc := &config.MetricPlugin{
-		Command: config.Command{
-			Args: cmd,
-		},
-	}
-	payload, err := metrics.NewPluginGenerator(pc).PrepareGraphDefs()
-	if err != nil {
-		return nil, errors.Wrap(err, "parse graph defs failed")
-	}
-
-	return payload, nil
 }

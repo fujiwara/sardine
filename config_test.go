@@ -6,14 +6,12 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/fujiwara/sardine"
-	mackerel "github.com/mackerelio/mackerel-client-go"
 )
 
 func TestLoadConfig(t *testing.T) {
 	c, err := sardine.LoadConfig(
 		"test/config.toml",
 		make(chan *cloudwatch.PutMetricDataInput, 1000),
-		make(chan []*mackerel.HostMetricValue, 1000),
 	)
 	if err != nil {
 		t.Error(err)
