@@ -22,7 +22,7 @@ var (
 func Run(configPath string) error {
 	ch := make(chan *cloudwatch.PutMetricDataInput, 1000)
 	mch := make(chan ServiceMetric, 1000)
-	conf, err := LoadConfig(configPath, ch, mch)
+	conf, err := LoadConfig(configPath)
 	if err != nil {
 		return err
 	}
@@ -35,9 +35,11 @@ func Run(configPath string) error {
 	go putToCloudWatch(ctx, ch)
 	go putToMackerel(ctx, conf, mch)
 
-	for _, mp := range conf.MetricPlugins {
-		go mp.Run(ctx)
-		time.Sleep(time.Second)
+	for _, cd := range conf.CloudWatchDriver {
+		go cd.Run(ctx, ch)
+	}
+	for _, md := range conf.MackerelDriver {
+		go md.Run(ctx, mch)
 	}
 	for _, cp := range conf.CheckPlugins {
 		go cp.Run(ctx, ch)

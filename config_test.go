@@ -4,23 +4,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/fujiwara/sardine"
 )
 
 func TestLoadConfig(t *testing.T) {
-	c, err := sardine.LoadConfig(
-		"test/config.toml",
-		make(chan *cloudwatch.PutMetricDataInput, 1000),
-		make(chan sardine.ServiceMetric, 1000),
-	)
+	c, err := sardine.LoadConfig("test/config.toml")
 	if err != nil {
 		t.Error(err)
 	}
 	if c.APIKey != "exampleKey" {
 		t.Errorf("unexpected apikey expected:exampleKey got:%s", c.APIKey)
 	}
-	mp := c.MetricPlugins["memcached"]
+	mp := c.CloudWatchDriver["memcached"].MetricPlugin
 	if mp.Command != "mackerel-plugin-memcached --host 127.0.0.1 --port 11211" {
 		t.Error("unexpected command", mp.Command)
 	}
@@ -55,7 +50,7 @@ func TestLoadConfig(t *testing.T) {
 		t.Errorf("unexpected timeout expected:1m got:%s", cp.Timeout)
 	}
 
-	msp := c.MetricPlugins["redis"]
+	msp := c.MackerelDriver["redis"].MetricPlugin
 	if msp.Command != "mackerel-plugin-redis" {
 		t.Error("unexpected command", msp.Command)
 	}

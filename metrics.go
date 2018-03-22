@@ -41,6 +41,14 @@ func (m *Metric) NewMetricDatum(ds []*cloudwatch.Dimension) *cloudwatch.MetricDa
 	}
 }
 
+func (m *Metric) NewMackerelServiceMetric() *mackerel.MetricValue {
+	return &mackerel.MetricValue{
+		Name:  m.Name,
+		Value: m.Value,
+		Time:  m.Timestamp.Unix(),
+	}
+}
+
 type ServiceMetric struct {
 	Service      string
 	MetricValues []*mackerel.MetricValue
@@ -52,8 +60,14 @@ type PluginDriver interface {
 }
 
 type CloudWatchDriver struct {
-	Dimensions [][]*cloudwatch.Dimension
-	Ch         chan *cloudwatch.PutMetricDataInput
+	Dimensions   [][]*cloudwatch.Dimension
+	Ch           chan *cloudwatch.PutMetricDataInput
+	MetricPlugin *MetricPlugin
+}
+
+func (cd *CloudWatchDriver) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
+	cd.Ch = ch
+	cd.MetricPlugin.Run(ctx)
 }
 
 func (cd *CloudWatchDriver) enqueue(metrics []*Metric) {
@@ -106,18 +120,20 @@ func (cd *CloudWatchDriver) parseMetricLine(b string) (*Metric, error) {
 }
 
 type MackerelDriver struct {
-	Service string
-	Ch      chan ServiceMetric
+	Service      string
+	Ch           chan ServiceMetric
+	MetricPlugin *MetricPlugin
+}
+
+func (md *MackerelDriver) Run(ctx context.Context, ch chan ServiceMetric) {
+	md.Ch = ch
+	md.MetricPlugin.Run(ctx)
 }
 
 func (md *MackerelDriver) enqueue(metrics []*Metric) {
 	mv := []*mackerel.MetricValue{}
 	for _, m := range metrics {
-		mv = append(mv, &mackerel.MetricValue{
-			Name:  m.Name,
-			Value: m.Value,
-			Time:  m.Timestamp.Unix(),
-		})
+		mv = append(mv, m.NewMackerelServiceMetric())
 	}
 
 	md.Ch <- ServiceMetric{

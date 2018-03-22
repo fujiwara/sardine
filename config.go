@@ -12,10 +12,11 @@ import (
 )
 
 type Config struct {
-	APIKey        string
-	Plugin        map[string]map[string]*PluginConfig
-	MetricPlugins map[string]*MetricPlugin
-	CheckPlugins  map[string]*CheckPlugin
+	APIKey           string
+	Plugin           map[string]map[string]*PluginConfig
+	CheckPlugins     map[string]*CheckPlugin
+	CloudWatchDriver map[string]*CloudWatchDriver
+	MackerelDriver   map[string]*MackerelDriver
 }
 
 type duration struct {
@@ -56,7 +57,7 @@ func (d *Dimension) CloudWatchDimensions() ([]*cloudwatch.Dimension, error) {
 	return ds, nil
 }
 
-func (pc *PluginConfig) NewMetricPlugin(id string, ch chan *cloudwatch.PutMetricDataInput) (*MetricPlugin, error) {
+func (pc *PluginConfig) NewCloudWatchDriver(id string) (*CloudWatchDriver, error) {
 	if pc.Command == "" {
 		return nil, errors.New("command required")
 	}
@@ -69,22 +70,24 @@ func (pc *PluginConfig) NewMetricPlugin(id string, ch chan *cloudwatch.PutMetric
 		}
 	}
 	mp := &MetricPlugin{
-		ID:           fmt.Sprintf("plugin.metrics.%s", id),
-		Command:      pc.Command,
-		Timeout:      pc.Timeout.Duration,
-		Interval:     pc.Interval.Duration,
-		PluginDriver: &CloudWatchDriver{Dimensions: dimensions, Ch: ch},
+		ID:       fmt.Sprintf("plugin.metrics.%s", id),
+		Command:  pc.Command,
+		Timeout:  pc.Timeout.Duration,
+		Interval: pc.Interval.Duration,
 	}
+	pd := &CloudWatchDriver{Dimensions: dimensions, MetricPlugin: mp}
+
+	mp.PluginDriver = pd
 	if mp.Timeout == 0 {
 		mp.Timeout = DefaultCommandTimeout
 	}
 	if mp.Interval == 0 {
 		mp.Interval = DefaultInterval
 	}
-	return mp, nil
+	return pd, nil
 }
 
-func (pc *PluginConfig) NewServiceMetricPlugin(id string, ch chan ServiceMetric) (*MetricPlugin, error) {
+func (pc *PluginConfig) NewMackerelDriver(id string) (*MackerelDriver, error) {
 	if pc.Command == "" {
 		return nil, errors.New("command required")
 	}
@@ -92,19 +95,23 @@ func (pc *PluginConfig) NewServiceMetricPlugin(id string, ch chan ServiceMetric)
 		return nil, errors.New("service required")
 	}
 	mp := &MetricPlugin{
-		ID:           fmt.Sprintf("plugin.servicemetrics.%s", id),
-		Command:      pc.Command,
-		Timeout:      pc.Timeout.Duration,
-		Interval:     pc.Interval.Duration,
-		PluginDriver: &MackerelDriver{Service: pc.Service, Ch: ch},
+		ID:       fmt.Sprintf("plugin.servicemetrics.%s", id),
+		Command:  pc.Command,
+		Timeout:  pc.Timeout.Duration,
+		Interval: pc.Interval.Duration,
 	}
+
+	pd := &MackerelDriver{Service: pc.Service, MetricPlugin: mp}
+
+	mp.PluginDriver = pd
+
 	if mp.Timeout == 0 {
 		mp.Timeout = DefaultCommandTimeout
 	}
 	if mp.Interval == 0 {
 		mp.Interval = DefaultInterval
 	}
-	return mp, nil
+	return pd, nil
 }
 
 func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
@@ -138,10 +145,11 @@ func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
 	return cp, nil
 }
 
-func LoadConfig(path string, ch chan *cloudwatch.PutMetricDataInput, mch chan ServiceMetric) (*Config, error) {
+func LoadConfig(path string) (*Config, error) {
 	c := &Config{
-		MetricPlugins: make(map[string]*MetricPlugin),
-		CheckPlugins:  make(map[string]*CheckPlugin),
+		CheckPlugins:     make(map[string]*CheckPlugin),
+		CloudWatchDriver: make(map[string]*CloudWatchDriver),
+		MackerelDriver:   make(map[string]*MackerelDriver),
 	}
 
 	if err := config.LoadWithEnvTOML(&c, path); err != nil {
@@ -152,11 +160,11 @@ func LoadConfig(path string, ch chan *cloudwatch.PutMetricDataInput, mch chan Se
 		switch key {
 		case "metrics":
 			for id, pc := range value {
-				mp, err := pc.NewMetricPlugin(id, ch)
+				d, err := pc.NewCloudWatchDriver(id)
 				if err != nil {
 					return nil, err
 				}
-				c.MetricPlugins[id] = mp
+				c.CloudWatchDriver[id] = d
 			}
 		case "check":
 			for id, pc := range value {
@@ -168,11 +176,11 @@ func LoadConfig(path string, ch chan *cloudwatch.PutMetricDataInput, mch chan Se
 			}
 		case "servicemetrics":
 			for id, pc := range value {
-				smp, err := pc.NewServiceMetricPlugin(id, mch)
+				d, err := pc.NewMackerelDriver(id)
 				if err != nil {
 					return nil, err
 				}
-				c.MetricPlugins[id] = smp
+				c.MackerelDriver[id] = d
 			}
 		default:
 			return nil, fmt.Errorf("unknown config section [plugin.%s]", key)
