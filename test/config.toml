@@ -1,3 +1,5 @@
+apikey = 'exampleKey'
+
 [plugin.metrics.memcached]
 command    = 'mackerel-plugin-memcached --host 127.0.0.1 --port {{ env "MEMCACHED_PORT" "11211" }}'
 dimensions = ["Instance-Id=i-12345678", "Host=127.0.0.1"]
@@ -7,3 +9,7 @@ interval   = "10s"
 [plugin.check.memcached]
 namespace = "memcached/check"
 command   = "sh -c 'echo version | nc 127.0.0.1 {{ env `MEMCACHED_PORT` `11211` }}'"
+
+[plugin.servicemetrics.redis]
+command    = 'mackerel-plugin-redis'
+service    = "production"

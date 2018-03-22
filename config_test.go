@@ -12,9 +12,13 @@ func TestLoadConfig(t *testing.T) {
 	c, err := sardine.LoadConfig(
 		"test/config.toml",
 		make(chan *cloudwatch.PutMetricDataInput, 1000),
+		make(chan sardine.ServiceMetric, 1000),
 	)
 	if err != nil {
 		t.Error(err)
+	}
+	if c.APIKey != "exampleKey" {
+		t.Errorf("unexpected apikey expected:exampleKey got:%s", c.APIKey)
 	}
 	mp := c.MetricPlugins["memcached"]
 	if mp.Command != "mackerel-plugin-memcached --host 127.0.0.1 --port 11211" {
@@ -49,6 +53,18 @@ func TestLoadConfig(t *testing.T) {
 	}
 	if cp.Timeout != time.Minute {
 		t.Errorf("unexpected timeout expected:1m got:%s", cp.Timeout)
+	}
+
+	msp := c.MetricPlugins["redis"]
+	if msp.Command != "mackerel-plugin-redis" {
+		t.Error("unexpected command", msp.Command)
+	}
+	if driver, ok := (msp.PluginDriver).(*sardine.MackerelDriver); ok {
+		if driver.Service != "production" {
+			t.Error("unexpected service", driver.Service)
+		}
+	} else {
+		t.Errorf("failed assertion: msp.PluginDriver expected *sardine.MackerelDriver")
 	}
 }
 

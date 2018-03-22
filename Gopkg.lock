@@ -8,18 +8,6 @@
   version = "v0.3.0"
 
 [[projects]]
-  name = "github.com/Songmu/timeout"
-  packages = ["."]
-  revision = "99732a2d3ea37f1111245d34bc520b25b83ecb65"
-  version = "v0.3.1"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/Songmu/wrapcommander"
-  packages = ["."]
-  revision = "c228fd70413bba4c4b70d0bd78d4665dc6ec252b"
-
-[[projects]]
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -62,12 +50,6 @@
   revision = "0b12d6b5"
 
 [[projects]]
-  name = "github.com/k0kubun/pp"
-  packages = ["."]
-  revision = "027a6d1765d673d337e687394dbe780dd64e2a1e"
-  version = "v2.3.0"
-
-[[projects]]
   branch = "master"
   name = "github.com/kayac/go-config"
   packages = ["."]
@@ -75,49 +57,9 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/mackerelio/go-osstat"
-  packages = [
-    "loadavg",
-    "network"
-  ]
-  revision = "192e3c5eacaf0298c586d075196af1570c912e2f"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/mackerelio/golib"
-  packages = ["logging"]
-  revision = "295ea2626d02a5d78c2ad6c4148a77ab68540b79"
-
-[[projects]]
-  name = "github.com/mackerelio/mackerel-agent"
-  packages = [
-    "checks",
-    "cmdutil",
-    "config",
-    "mackerel",
-    "metrics",
-    "util"
-  ]
-  revision = "bf64e4de030415c1574b0babf89186e18e8edec0"
-  version = "v0.53.0"
-
-[[projects]]
-  branch = "master"
   name = "github.com/mackerelio/mackerel-client-go"
   packages = ["."]
   revision = "f8d2a23df607c93fe287c259576a408141fbf116"
-
-[[projects]]
-  name = "github.com/mattn/go-colorable"
-  packages = ["."]
-  revision = "167de6bfdfba052fa6b2d3664c8f5272e23c9072"
-  version = "v0.0.9"
-
-[[projects]]
-  name = "github.com/mattn/go-isatty"
-  packages = ["."]
-  revision = "0360b2af4f38e8d38c7fce2a9f4e702702d73a39"
-  version = "v0.0.3"
 
 [[projects]]
   name = "github.com/mattn/go-shellwords"
@@ -132,12 +74,6 @@
   version = "v0.8.0"
 
 [[projects]]
-  branch = "master"
-  name = "golang.org/x/sys"
-  packages = ["unix"]
-  revision = "01acb38716e021ed1fc03a602bdb5838e1358c5e"
-
-[[projects]]
   branch = "v2"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
@@ -146,6 +82,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7fe7954eee83688632bd4b4bb3926e7863ce1fae4f0cb9554b88f998c3f249ef"
+  inputs-digest = "fc26534f47cd1eef555d0bc9f2bf7b0a7bc14566f7da169172076bbf813b18da"
   solver-name = "gps-cdcl"
   solver-version = 1

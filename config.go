@@ -34,6 +34,7 @@ type PluginConfig struct {
 	Timeout    duration
 	Interval   duration
 	Dimensions []*Dimension
+	Service    string
 }
 
 type Dimension string
@@ -83,6 +84,29 @@ func (pc *PluginConfig) NewMetricPlugin(id string, ch chan *cloudwatch.PutMetric
 	return mp, nil
 }
 
+func (pc *PluginConfig) NewServiceMetricPlugin(id string, ch chan ServiceMetric) (*MetricPlugin, error) {
+	if pc.Command == "" {
+		return nil, errors.New("command required")
+	}
+	if pc.Service == "" {
+		return nil, errors.New("service required")
+	}
+	mp := &MetricPlugin{
+		ID:           fmt.Sprintf("plugin.servicemetrics.%s", id),
+		Command:      pc.Command,
+		Timeout:      pc.Timeout.Duration,
+		Interval:     pc.Interval.Duration,
+		PluginDriver: &MackerelDriver{Service: pc.Service, Ch: ch},
+	}
+	if mp.Timeout == 0 {
+		mp.Timeout = DefaultCommandTimeout
+	}
+	if mp.Interval == 0 {
+		mp.Interval = DefaultInterval
+	}
+	return mp, nil
+}
+
 func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
 	if pc.Namespace == "" {
 		return nil, errors.New("namespace required")
@@ -114,7 +138,7 @@ func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
 	return cp, nil
 }
 
-func LoadConfig(path string, ch chan *cloudwatch.PutMetricDataInput) (*Config, error) {
+func LoadConfig(path string, ch chan *cloudwatch.PutMetricDataInput, mch chan ServiceMetric) (*Config, error) {
 	c := &Config{
 		MetricPlugins: make(map[string]*MetricPlugin),
 		CheckPlugins:  make(map[string]*CheckPlugin),
@@ -141,6 +165,14 @@ func LoadConfig(path string, ch chan *cloudwatch.PutMetricDataInput) (*Config, e
 					return nil, err
 				}
 				c.CheckPlugins[id] = cp
+			}
+		case "servicemetrics":
+			for id, pc := range value {
+				smp, err := pc.NewServiceMetricPlugin(id, mch)
+				if err != nil {
+					return nil, err
+				}
+				c.MetricPlugins[id] = smp
 			}
 		default:
 			return nil, fmt.Errorf("unknown config section [plugin.%s]", key)

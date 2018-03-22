@@ -12,6 +12,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	mackerel "github.com/mackerelio/mackerel-client-go"
 	shellwords "github.com/mattn/go-shellwords"
 	"github.com/pkg/errors"
 )
@@ -38,6 +39,11 @@ func (m *Metric) NewMetricDatum(ds []*cloudwatch.Dimension) *cloudwatch.MetricDa
 		Timestamp:  &m.Timestamp,
 		Dimensions: ds,
 	}
+}
+
+type ServiceMetric struct {
+	Service      string
+	MetricValues []*mackerel.MetricValue
 }
 
 type PluginDriver interface {
@@ -83,6 +89,52 @@ func (cd *CloudWatchDriver) parseMetricLine(b string) (*Metric, error) {
 		m.Namespace = ns[0] + "/" + ns[1]
 		m.Name = ns[2]
 	}
+
+	if v, err := strconv.ParseFloat(value, 64); err != nil {
+		return nil, fmt.Errorf("invalid metric value: %s", value)
+	} else {
+		m.Value = v
+	}
+
+	if ts, err := strconv.ParseInt(timestamp, 10, 64); err != nil {
+		return nil, fmt.Errorf("invalid metric time: %s", timestamp)
+	} else {
+		m.Timestamp = time.Unix(ts, 0)
+	}
+
+	return &m, nil
+}
+
+type MackerelDriver struct {
+	Service string
+	Ch      chan ServiceMetric
+}
+
+func (md *MackerelDriver) enqueue(metrics []*Metric) {
+	mv := []*mackerel.MetricValue{}
+	for _, m := range metrics {
+		mv = append(mv, &mackerel.MetricValue{
+			Name:  m.Name,
+			Value: m.Value,
+			Time:  m.Timestamp.Unix(),
+		})
+	}
+
+	md.Ch <- ServiceMetric{
+		Service:      md.Service,
+		MetricValues: mv,
+	}
+}
+
+func (md *MackerelDriver) parseMetricLine(b string) (*Metric, error) {
+	cols := strings.SplitN(b, "\t", 3)
+	if len(cols) < 3 {
+		return nil, errors.New("invalid metric format. insufficient columns")
+	}
+	name, value, timestamp := cols[0], cols[1], cols[2]
+	var m Metric
+
+	m.Name = name
 
 	if v, err := strconv.ParseFloat(value, 64); err != nil {
 		return nil, fmt.Errorf("invalid metric value: %s", value)

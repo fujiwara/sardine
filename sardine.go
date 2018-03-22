@@ -9,6 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/k0kubun/pp"
+	mackerel "github.com/mackerelio/mackerel-client-go"
 )
 
 var (
@@ -19,7 +21,8 @@ var (
 
 func Run(configPath string) error {
 	ch := make(chan *cloudwatch.PutMetricDataInput, 1000)
-	conf, err := LoadConfig(configPath, ch)
+	mch := make(chan ServiceMetric, 1000)
+	conf, err := LoadConfig(configPath, ch, mch)
 	if err != nil {
 		return err
 	}
@@ -30,6 +33,7 @@ func Run(configPath string) error {
 	wg.Add(1)
 
 	go putToCloudWatch(ctx, ch)
+	go putToMackerel(ctx, conf, mch)
 
 	for _, mp := range conf.MetricPlugins {
 		go mp.Run(ctx)
@@ -54,11 +58,31 @@ func putToCloudWatch(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput
 			return
 		case in := <-ch:
 			if Debug {
-				log.Println("put", in)
+				log.Println("putToCloudWatch", in)
 			}
 			_, err := svc.PutMetricDataWithContext(ctx, in, request.WithResponseReadTimeout(30*time.Second))
 			if err != nil {
 				log.Println("putMetricData failed:", err)
+			}
+		}
+	}
+}
+
+func putToMackerel(ctx context.Context, conf *Config, ch chan ServiceMetric) {
+	c := mackerel.NewClient(conf.APIKey)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case in := <-ch:
+			if Debug {
+				log.Println("putToMackerel")
+				pp.Println(in)
+			}
+			err := c.PostServiceMetricValues(in.Service, in.MetricValues)
+			if err != nil {
+				log.Println("putToMackerel failed:", err)
 			}
 		}
 	}
