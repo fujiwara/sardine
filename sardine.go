@@ -3,6 +3,7 @@ package sardine
 import (
 	"context"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -71,7 +72,7 @@ func putToCloudWatch(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput
 }
 
 func putToMackerel(ctx context.Context, conf *Config, ch chan ServiceMetric) {
-	c := mackerel.NewClient(conf.APIKey)
+	c := mackerel.NewClient(os.Getenv("MACKEREL_API_KEY"))
 
 	for {
 		select {
