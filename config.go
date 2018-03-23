@@ -58,7 +58,7 @@ func (d *Dimension) CloudWatchDimensions() ([]*cloudwatch.Dimension, error) {
 	return ds, nil
 }
 
-func (pc *PluginConfig) NewCloudWatchDriver(id string) (*CloudWatchMetricPlugin, error) {
+func (pc *PluginConfig) NewCloudWatchMetricPlugin(id string) (*CloudWatchMetricPlugin, error) {
 	if pc.Command == "" {
 		return nil, errors.New("command required")
 	}
@@ -88,7 +88,7 @@ func (pc *PluginConfig) NewCloudWatchDriver(id string) (*CloudWatchMetricPlugin,
 	return pd, nil
 }
 
-func (pc *PluginConfig) NewMackerelDriver(id string) (*MackerelMetricPlugin, error) {
+func (pc *PluginConfig) NewMackerelMetricPlugin(id string) (*MackerelMetricPlugin, error) {
 	if pc.Command == "" {
 		return nil, errors.New("command required")
 	}
@@ -162,13 +162,13 @@ func LoadConfig(path string) (*Config, error) {
 		case "metrics":
 			for id, pc := range value {
 				if pc.Destination == "mackerel" {
-					d, err := pc.NewMackerelDriver(id)
+					d, err := pc.NewMackerelMetricPlugin(id)
 					if err != nil {
 						return nil, err
 					}
 					c.MackerelMetricPlugins[id] = d
 				} else {
-					d, err := pc.NewCloudWatchDriver(id)
+					d, err := pc.NewCloudWatchMetricPlugin(id)
 					if err != nil {
 						return nil, err
 					}
