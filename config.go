@@ -12,7 +12,6 @@ import (
 )
 
 type Config struct {
-	APIKey                  string
 	Plugin                  map[string]map[string]*PluginConfig
 	CheckPlugins            map[string]*CheckPlugin
 	CloudWatchMetricPlugins map[string]*CloudWatchMetricPlugin
