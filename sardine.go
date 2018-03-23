@@ -34,7 +34,7 @@ func Run(configPath string) error {
 	wg.Add(1)
 
 	go putToCloudWatch(ctx, ch)
-	go putToMackerel(ctx, conf, mch)
+	go putToMackerel(ctx, mch)
 
 	for _, cmp := range conf.CloudWatchMetricPlugins {
 		go cmp.Run(ctx, ch)
@@ -71,7 +71,7 @@ func putToCloudWatch(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput
 	}
 }
 
-func putToMackerel(ctx context.Context, conf *Config, ch chan ServiceMetric) {
+func putToMackerel(ctx context.Context, ch chan ServiceMetric) {
 	c := mackerel.NewClient(os.Getenv("MACKEREL_API_KEY"))
 
 	for {
