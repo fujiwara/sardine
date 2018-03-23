@@ -72,7 +72,7 @@ func putToCloudWatch(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput
 }
 
 func putToMackerel(ctx context.Context, ch chan ServiceMetric) {
-	c := mackerel.NewClient(os.Getenv("MACKEREL_API_KEY"))
+	c := mackerel.NewClient(os.Getenv("MACKEREL_APIKEY"))
 
 	for {
 		select {
