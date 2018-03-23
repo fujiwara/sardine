@@ -12,16 +12,17 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	mackerel "github.com/mackerelio/mackerel-client-go"
 	shellwords "github.com/mattn/go-shellwords"
 	"github.com/pkg/errors"
 )
 
 type MetricPlugin struct {
-	ID         string
-	Command    string
-	Timeout    time.Duration
-	Interval   time.Duration
-	Dimensions [][]*cloudwatch.Dimension
+	ID           string
+	Command      string
+	Timeout      time.Duration
+	Interval     time.Duration
+	PluginDriver PluginDriver
 }
 
 type Metric struct {
@@ -40,7 +41,46 @@ func (m *Metric) NewMetricDatum(ds []*cloudwatch.Dimension) *cloudwatch.MetricDa
 	}
 }
 
-func parseMetricLine(b string) (*Metric, error) {
+type ServiceMetric struct {
+	Service      string
+	MetricValues []*mackerel.MetricValue
+}
+
+type PluginDriver interface {
+	enqueue([]*Metric)
+	parseMetricLine(string) (*Metric, error)
+}
+
+type CloudWatchMetricPlugin struct {
+	MetricPlugin
+	Dimensions [][]*cloudwatch.Dimension
+	Ch         chan *cloudwatch.PutMetricDataInput
+}
+
+func (cmp *CloudWatchMetricPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
+	cmp.Ch = ch
+	cmp.MetricPlugin.Run(ctx)
+}
+
+func (cmp *CloudWatchMetricPlugin) enqueue(metrics []*Metric) {
+	mds := make(map[string][]*cloudwatch.MetricDatum, len(cmp.Dimensions)+1)
+	for _, metric := range metrics {
+		ns := metric.Namespace
+		for _, ds := range cmp.Dimensions {
+			mds[ns] = append(mds[ns], metric.NewMetricDatum(ds))
+		}
+		// no dimension metric
+		mds[ns] = append(mds[ns], metric.NewMetricDatum(nil))
+	}
+	for ns, data := range mds {
+		cmp.Ch <- &cloudwatch.PutMetricDataInput{
+			Namespace:  aws.String(ns),
+			MetricData: data,
+		}
+	}
+}
+
+func (cmp *CloudWatchMetricPlugin) parseMetricLine(b string) (*Metric, error) {
 	cols := strings.SplitN(b, "\t", 3)
 	if len(cols) < 3 {
 		return nil, errors.New("invalid metric format. insufficient columns")
@@ -71,7 +111,59 @@ func parseMetricLine(b string) (*Metric, error) {
 	return &m, nil
 }
 
-func (mp *MetricPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
+type MackerelMetricPlugin struct {
+	MetricPlugin
+	Service string
+	Ch      chan ServiceMetric
+}
+
+func (mmp *MackerelMetricPlugin) enqueue(metrics []*Metric) {
+	mv := []*mackerel.MetricValue{}
+	for _, m := range metrics {
+		mv = append(mv, &mackerel.MetricValue{
+			Name:  m.Name,
+			Value: m.Value,
+			Time:  m.Timestamp.Unix(),
+		})
+	}
+
+	mmp.Ch <- ServiceMetric{
+		Service:      mmp.Service,
+		MetricValues: mv,
+	}
+}
+
+func (mmp *MackerelMetricPlugin) parseMetricLine(b string) (*Metric, error) {
+	cols := strings.SplitN(b, "\t", 3)
+	if len(cols) < 3 {
+		return nil, errors.New("invalid metric format. insufficient columns")
+	}
+	name, value, timestamp := cols[0], cols[1], cols[2]
+	var m Metric
+
+	m.Name = name
+
+	if v, err := strconv.ParseFloat(value, 64); err != nil {
+		return nil, fmt.Errorf("invalid metric value: %s", value)
+	} else {
+		m.Value = v
+	}
+
+	if ts, err := strconv.ParseInt(timestamp, 10, 64); err != nil {
+		return nil, fmt.Errorf("invalid metric time: %s", timestamp)
+	} else {
+		m.Timestamp = time.Unix(ts, 0)
+	}
+
+	return &m, nil
+}
+
+func (mmp *MackerelMetricPlugin) Run(ctx context.Context, ch chan ServiceMetric) {
+	mmp.Ch = ch
+	mmp.MetricPlugin.Run(ctx)
+}
+
+func (mp *MetricPlugin) Run(ctx context.Context) {
 	ticker := time.NewTicker(mp.Interval)
 	log.Printf("[%s] starting", mp.ID)
 	for {
@@ -79,21 +171,8 @@ func (mp *MetricPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDa
 		if err != nil {
 			log.Printf("[%s] %s", mp.ID, err)
 		}
-		mds := make(map[string][]*cloudwatch.MetricDatum, len(mp.Dimensions)+1)
-		for _, metric := range metrics {
-			ns := metric.Namespace
-			for _, ds := range mp.Dimensions {
-				mds[ns] = append(mds[ns], metric.NewMetricDatum(ds))
-			}
-			// no dimension metric
-			mds[ns] = append(mds[ns], metric.NewMetricDatum(nil))
-		}
-		for ns, data := range mds {
-			ch <- &cloudwatch.PutMetricDataInput{
-				Namespace:  aws.String(ns),
-				MetricData: data,
-			}
-		}
+
+		mp.PluginDriver.enqueue(metrics)
 
 		select {
 		case <-ticker.C:
@@ -131,7 +210,7 @@ func (mp *MetricPlugin) Execute(_ctx context.Context) ([]*Metric, error) {
 	}
 
 	for scanner.Scan() {
-		m, err := parseMetricLine(scanner.Text())
+		m, err := mp.PluginDriver.parseMetricLine(scanner.Text())
 		if err != nil {
 			log.Println(err)
 			continue

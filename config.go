@@ -1,7 +1,6 @@
 package sardine
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -9,12 +8,14 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	config "github.com/kayac/go-config"
+	"github.com/pkg/errors"
 )
 
 type Config struct {
-	Plugin        map[string]map[string]*PluginConfig
-	MetricPlugins map[string]*MetricPlugin
-	CheckPlugins  map[string]*CheckPlugin
+	Plugin                  map[string]map[string]*PluginConfig
+	CheckPlugins            map[string]*CheckPlugin
+	CloudWatchMetricPlugins map[string]*CloudWatchMetricPlugin
+	MackerelMetricPlugins   map[string]*MackerelMetricPlugin
 }
 
 type duration struct {
@@ -28,11 +29,13 @@ func (d *duration) UnmarshalText(text []byte) error {
 }
 
 type PluginConfig struct {
-	Namespace  string
-	Command    string
-	Timeout    duration
-	Interval   duration
-	Dimensions []*Dimension
+	Namespace   string
+	Command     string
+	Timeout     duration
+	Interval    duration
+	Dimensions  []*Dimension
+	Destination string
+	Service     string
 }
 
 type Dimension string
@@ -54,30 +57,61 @@ func (d *Dimension) CloudWatchDimensions() ([]*cloudwatch.Dimension, error) {
 	return ds, nil
 }
 
-func (pc *PluginConfig) NewMetricPlugin(id string) (*MetricPlugin, error) {
+func (pc *PluginConfig) NewCloudWatchMetricPlugin(id string) (*CloudWatchMetricPlugin, error) {
 	if pc.Command == "" {
 		return nil, errors.New("command required")
 	}
-	mp := &MetricPlugin{
+	dimensions := [][]*cloudwatch.Dimension{}
+	for _, d := range pc.Dimensions {
+		if ds, err := d.CloudWatchDimensions(); err != nil {
+			return nil, err
+		} else {
+			dimensions = append(dimensions, ds)
+		}
+	}
+	mp := MetricPlugin{
 		ID:       fmt.Sprintf("plugin.metrics.%s", id),
 		Command:  pc.Command,
 		Timeout:  pc.Timeout.Duration,
 		Interval: pc.Interval.Duration,
 	}
-	for _, d := range pc.Dimensions {
-		if ds, err := d.CloudWatchDimensions(); err != nil {
-			return nil, err
-		} else {
-			mp.Dimensions = append(mp.Dimensions, ds)
-		}
-	}
+	pd := &CloudWatchMetricPlugin{Dimensions: dimensions, MetricPlugin: mp}
+
+	mp.PluginDriver = pd
 	if mp.Timeout == 0 {
 		mp.Timeout = DefaultCommandTimeout
 	}
 	if mp.Interval == 0 {
 		mp.Interval = DefaultInterval
 	}
-	return mp, nil
+	return pd, nil
+}
+
+func (pc *PluginConfig) NewMackerelMetricPlugin(id string) (*MackerelMetricPlugin, error) {
+	if pc.Command == "" {
+		return nil, errors.New("command required")
+	}
+	if pc.Service == "" {
+		return nil, errors.New("service required")
+	}
+	mp := MetricPlugin{
+		ID:       fmt.Sprintf("plugin.servicemetrics.%s", id),
+		Command:  pc.Command,
+		Timeout:  pc.Timeout.Duration,
+		Interval: pc.Interval.Duration,
+	}
+
+	pd := &MackerelMetricPlugin{Service: pc.Service, MetricPlugin: mp}
+
+	mp.PluginDriver = pd
+
+	if mp.Timeout == 0 {
+		mp.Timeout = DefaultCommandTimeout
+	}
+	if mp.Interval == 0 {
+		mp.Interval = DefaultInterval
+	}
+	return pd, nil
 }
 
 func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
@@ -112,22 +146,33 @@ func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
 }
 
 func LoadConfig(path string) (*Config, error) {
-	c := Config{
-		MetricPlugins: make(map[string]*MetricPlugin),
-		CheckPlugins:  make(map[string]*CheckPlugin),
+	c := &Config{
+		CheckPlugins:            make(map[string]*CheckPlugin),
+		CloudWatchMetricPlugins: make(map[string]*CloudWatchMetricPlugin),
+		MackerelMetricPlugins:   make(map[string]*MackerelMetricPlugin),
 	}
+
 	if err := config.LoadWithEnvTOML(&c, path); err != nil {
 		return nil, err
 	}
+
 	for key, value := range c.Plugin {
 		switch key {
 		case "metrics":
 			for id, pc := range value {
-				mp, err := pc.NewMetricPlugin(id)
-				if err != nil {
-					return nil, err
+				if pc.Destination == "mackerel" {
+					d, err := pc.NewMackerelMetricPlugin(id)
+					if err != nil {
+						return nil, err
+					}
+					c.MackerelMetricPlugins[id] = d
+				} else {
+					d, err := pc.NewCloudWatchMetricPlugin(id)
+					if err != nil {
+						return nil, err
+					}
+					c.CloudWatchMetricPlugins[id] = d
 				}
-				c.MetricPlugins[id] = mp
 			}
 		case "check":
 			for id, pc := range value {
@@ -142,5 +187,6 @@ func LoadConfig(path string) (*Config, error) {
 		}
 	}
 	c.Plugin = nil
-	return &c, nil
+
+	return c, nil
 }

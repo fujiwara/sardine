@@ -7,3 +7,8 @@ interval   = "10s"
 [plugin.check.memcached]
 namespace = "memcached/check"
 command   = "sh -c 'echo version | nc 127.0.0.1 {{ env `MEMCACHED_PORT` `11211` }}'"
+
+[plugin.metrics.redis]
+command     = 'mackerel-plugin-redis'
+destination = "mackerel"
+service     = "production"
