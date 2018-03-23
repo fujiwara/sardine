@@ -30,12 +30,13 @@ func (d *duration) UnmarshalText(text []byte) error {
 }
 
 type PluginConfig struct {
-	Namespace  string
-	Command    string
-	Timeout    duration
-	Interval   duration
-	Dimensions []*Dimension
-	Service    string
+	Namespace   string
+	Command     string
+	Timeout     duration
+	Interval    duration
+	Dimensions  []*Dimension
+	Destination string
+	Service     string
 }
 
 type Dimension string
@@ -160,11 +161,19 @@ func LoadConfig(path string) (*Config, error) {
 		switch key {
 		case "metrics":
 			for id, pc := range value {
-				d, err := pc.NewCloudWatchDriver(id)
-				if err != nil {
-					return nil, err
+				if pc.Destination == "mackerel" {
+					d, err := pc.NewMackerelDriver(id)
+					if err != nil {
+						return nil, err
+					}
+					c.MackerelMetricPlugins[id] = d
+				} else {
+					d, err := pc.NewCloudWatchDriver(id)
+					if err != nil {
+						return nil, err
+					}
+					c.CloudWatchMetricPlugins[id] = d
 				}
-				c.CloudWatchMetricPlugins[id] = d
 			}
 		case "check":
 			for id, pc := range value {
@@ -173,14 +182,6 @@ func LoadConfig(path string) (*Config, error) {
 					return nil, err
 				}
 				c.CheckPlugins[id] = cp
-			}
-		case "servicemetrics":
-			for id, pc := range value {
-				d, err := pc.NewMackerelDriver(id)
-				if err != nil {
-					return nil, err
-				}
-				c.MackerelMetricPlugins[id] = d
 			}
 		default:
 			return nil, fmt.Errorf("unknown config section [plugin.%s]", key)
