@@ -57,30 +57,30 @@ type CloudWatchMetricPlugin struct {
 	Ch         chan *cloudwatch.PutMetricDataInput
 }
 
-func (cd *CloudWatchMetricPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
-	cd.Ch = ch
-	cd.MetricPlugin.Run(ctx)
+func (cmp *CloudWatchMetricPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
+	cmp.Ch = ch
+	cmp.MetricPlugin.Run(ctx)
 }
 
-func (cd *CloudWatchMetricPlugin) enqueue(metrics []*Metric) {
-	mds := make(map[string][]*cloudwatch.MetricDatum, len(cd.Dimensions)+1)
+func (cmp *CloudWatchMetricPlugin) enqueue(metrics []*Metric) {
+	mds := make(map[string][]*cloudwatch.MetricDatum, len(cmp.Dimensions)+1)
 	for _, metric := range metrics {
 		ns := metric.Namespace
-		for _, ds := range cd.Dimensions {
+		for _, ds := range cmp.Dimensions {
 			mds[ns] = append(mds[ns], metric.NewMetricDatum(ds))
 		}
 		// no dimension metric
 		mds[ns] = append(mds[ns], metric.NewMetricDatum(nil))
 	}
 	for ns, data := range mds {
-		cd.Ch <- &cloudwatch.PutMetricDataInput{
+		cmp.Ch <- &cloudwatch.PutMetricDataInput{
 			Namespace:  aws.String(ns),
 			MetricData: data,
 		}
 	}
 }
 
-func (cd *CloudWatchMetricPlugin) parseMetricLine(b string) (*Metric, error) {
+func (cmp *CloudWatchMetricPlugin) parseMetricLine(b string) (*Metric, error) {
 	cols := strings.SplitN(b, "\t", 3)
 	if len(cols) < 3 {
 		return nil, errors.New("invalid metric format. insufficient columns")
@@ -117,7 +117,7 @@ type MackerelMetricPlugin struct {
 	Ch      chan ServiceMetric
 }
 
-func (md *MackerelMetricPlugin) enqueue(metrics []*Metric) {
+func (mmp *MackerelMetricPlugin) enqueue(metrics []*Metric) {
 	mv := []*mackerel.MetricValue{}
 	for _, m := range metrics {
 		mv = append(mv, &mackerel.MetricValue{
@@ -127,13 +127,13 @@ func (md *MackerelMetricPlugin) enqueue(metrics []*Metric) {
 		})
 	}
 
-	md.Ch <- ServiceMetric{
-		Service:      md.Service,
+	mmp.Ch <- ServiceMetric{
+		Service:      mmp.Service,
 		MetricValues: mv,
 	}
 }
 
-func (md *MackerelMetricPlugin) parseMetricLine(b string) (*Metric, error) {
+func (mmp *MackerelMetricPlugin) parseMetricLine(b string) (*Metric, error) {
 	cols := strings.SplitN(b, "\t", 3)
 	if len(cols) < 3 {
 		return nil, errors.New("invalid metric format. insufficient columns")
@@ -158,9 +158,9 @@ func (md *MackerelMetricPlugin) parseMetricLine(b string) (*Metric, error) {
 	return &m, nil
 }
 
-func (md *MackerelMetricPlugin) Run(ctx context.Context, ch chan ServiceMetric) {
-	md.Ch = ch
-	md.MetricPlugin.Run(ctx)
+func (mmp *MackerelMetricPlugin) Run(ctx context.Context, ch chan ServiceMetric) {
+	mmp.Ch = ch
+	mmp.MetricPlugin.Run(ctx)
 }
 
 func (mp *MetricPlugin) Run(ctx context.Context) {
