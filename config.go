@@ -12,11 +12,11 @@ import (
 )
 
 type Config struct {
-	APIKey           string
-	Plugin           map[string]map[string]*PluginConfig
-	CheckPlugins     map[string]*CheckPlugin
-	CloudWatchDriver map[string]*CloudWatchDriver
-	MackerelDriver   map[string]*MackerelDriver
+	APIKey                  string
+	Plugin                  map[string]map[string]*PluginConfig
+	CheckPlugins            map[string]*CheckPlugin
+	CloudWatchMetricPlugins map[string]*CloudWatchMetricPlugin
+	MackerelMetricPlugins   map[string]*MackerelMetricPlugin
 }
 
 type duration struct {
@@ -57,7 +57,7 @@ func (d *Dimension) CloudWatchDimensions() ([]*cloudwatch.Dimension, error) {
 	return ds, nil
 }
 
-func (pc *PluginConfig) NewCloudWatchDriver(id string) (*CloudWatchDriver, error) {
+func (pc *PluginConfig) NewCloudWatchDriver(id string) (*CloudWatchMetricPlugin, error) {
 	if pc.Command == "" {
 		return nil, errors.New("command required")
 	}
@@ -69,13 +69,13 @@ func (pc *PluginConfig) NewCloudWatchDriver(id string) (*CloudWatchDriver, error
 			dimensions = append(dimensions, ds)
 		}
 	}
-	mp := &MetricPlugin{
+	mp := MetricPlugin{
 		ID:       fmt.Sprintf("plugin.metrics.%s", id),
 		Command:  pc.Command,
 		Timeout:  pc.Timeout.Duration,
 		Interval: pc.Interval.Duration,
 	}
-	pd := &CloudWatchDriver{Dimensions: dimensions, MetricPlugin: mp}
+	pd := &CloudWatchMetricPlugin{Dimensions: dimensions, MetricPlugin: mp}
 
 	mp.PluginDriver = pd
 	if mp.Timeout == 0 {
@@ -87,21 +87,21 @@ func (pc *PluginConfig) NewCloudWatchDriver(id string) (*CloudWatchDriver, error
 	return pd, nil
 }
 
-func (pc *PluginConfig) NewMackerelDriver(id string) (*MackerelDriver, error) {
+func (pc *PluginConfig) NewMackerelDriver(id string) (*MackerelMetricPlugin, error) {
 	if pc.Command == "" {
 		return nil, errors.New("command required")
 	}
 	if pc.Service == "" {
 		return nil, errors.New("service required")
 	}
-	mp := &MetricPlugin{
+	mp := MetricPlugin{
 		ID:       fmt.Sprintf("plugin.servicemetrics.%s", id),
 		Command:  pc.Command,
 		Timeout:  pc.Timeout.Duration,
 		Interval: pc.Interval.Duration,
 	}
 
-	pd := &MackerelDriver{Service: pc.Service, MetricPlugin: mp}
+	pd := &MackerelMetricPlugin{Service: pc.Service, MetricPlugin: mp}
 
 	mp.PluginDriver = pd
 
@@ -147,9 +147,9 @@ func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
 
 func LoadConfig(path string) (*Config, error) {
 	c := &Config{
-		CheckPlugins:     make(map[string]*CheckPlugin),
-		CloudWatchDriver: make(map[string]*CloudWatchDriver),
-		MackerelDriver:   make(map[string]*MackerelDriver),
+		CheckPlugins:            make(map[string]*CheckPlugin),
+		CloudWatchMetricPlugins: make(map[string]*CloudWatchMetricPlugin),
+		MackerelMetricPlugins:   make(map[string]*MackerelMetricPlugin),
 	}
 
 	if err := config.LoadWithEnvTOML(&c, path); err != nil {
@@ -164,7 +164,7 @@ func LoadConfig(path string) (*Config, error) {
 				if err != nil {
 					return nil, err
 				}
-				c.CloudWatchDriver[id] = d
+				c.CloudWatchMetricPlugins[id] = d
 			}
 		case "check":
 			for id, pc := range value {
@@ -180,7 +180,7 @@ func LoadConfig(path string) (*Config, error) {
 				if err != nil {
 					return nil, err
 				}
-				c.MackerelDriver[id] = d
+				c.MackerelMetricPlugins[id] = d
 			}
 		default:
 			return nil, fmt.Errorf("unknown config section [plugin.%s]", key)

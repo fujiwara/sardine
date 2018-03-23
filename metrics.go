@@ -51,18 +51,18 @@ type PluginDriver interface {
 	parseMetricLine(string) (*Metric, error)
 }
 
-type CloudWatchDriver struct {
-	Dimensions   [][]*cloudwatch.Dimension
-	Ch           chan *cloudwatch.PutMetricDataInput
-	MetricPlugin *MetricPlugin
+type CloudWatchMetricPlugin struct {
+	MetricPlugin
+	Dimensions [][]*cloudwatch.Dimension
+	Ch         chan *cloudwatch.PutMetricDataInput
 }
 
-func (cd *CloudWatchDriver) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
+func (cd *CloudWatchMetricPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
 	cd.Ch = ch
 	cd.MetricPlugin.Run(ctx)
 }
 
-func (cd *CloudWatchDriver) enqueue(metrics []*Metric) {
+func (cd *CloudWatchMetricPlugin) enqueue(metrics []*Metric) {
 	mds := make(map[string][]*cloudwatch.MetricDatum, len(cd.Dimensions)+1)
 	for _, metric := range metrics {
 		ns := metric.Namespace
@@ -80,7 +80,7 @@ func (cd *CloudWatchDriver) enqueue(metrics []*Metric) {
 	}
 }
 
-func (cd *CloudWatchDriver) parseMetricLine(b string) (*Metric, error) {
+func (cd *CloudWatchMetricPlugin) parseMetricLine(b string) (*Metric, error) {
 	cols := strings.SplitN(b, "\t", 3)
 	if len(cols) < 3 {
 		return nil, errors.New("invalid metric format. insufficient columns")
@@ -111,18 +111,13 @@ func (cd *CloudWatchDriver) parseMetricLine(b string) (*Metric, error) {
 	return &m, nil
 }
 
-type MackerelDriver struct {
-	Service      string
-	Ch           chan ServiceMetric
-	MetricPlugin *MetricPlugin
+type MackerelMetricPlugin struct {
+	MetricPlugin
+	Service string
+	Ch      chan ServiceMetric
 }
 
-func (md *MackerelDriver) Run(ctx context.Context, ch chan ServiceMetric) {
-	md.Ch = ch
-	md.MetricPlugin.Run(ctx)
-}
-
-func (md *MackerelDriver) enqueue(metrics []*Metric) {
+func (md *MackerelMetricPlugin) enqueue(metrics []*Metric) {
 	mv := []*mackerel.MetricValue{}
 	for _, m := range metrics {
 		mv = append(mv, &mackerel.MetricValue{
@@ -138,7 +133,7 @@ func (md *MackerelDriver) enqueue(metrics []*Metric) {
 	}
 }
 
-func (md *MackerelDriver) parseMetricLine(b string) (*Metric, error) {
+func (md *MackerelMetricPlugin) parseMetricLine(b string) (*Metric, error) {
 	cols := strings.SplitN(b, "\t", 3)
 	if len(cols) < 3 {
 		return nil, errors.New("invalid metric format. insufficient columns")
@@ -161,6 +156,11 @@ func (md *MackerelDriver) parseMetricLine(b string) (*Metric, error) {
 	}
 
 	return &m, nil
+}
+
+func (md *MackerelMetricPlugin) Run(ctx context.Context, ch chan ServiceMetric) {
+	md.Ch = ch
+	md.MetricPlugin.Run(ctx)
 }
 
 func (mp *MetricPlugin) Run(ctx context.Context) {

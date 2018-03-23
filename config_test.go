@@ -15,27 +15,23 @@ func TestLoadConfig(t *testing.T) {
 	if c.APIKey != "exampleKey" {
 		t.Errorf("unexpected apikey expected:exampleKey got:%s", c.APIKey)
 	}
-	mp := c.CloudWatchDriver["memcached"].MetricPlugin
-	if mp.Command != "mackerel-plugin-memcached --host 127.0.0.1 --port 11211" {
-		t.Error("unexpected command", mp.Command)
+	cmp := c.CloudWatchMetricPlugins["memcached"]
+	if cmp.Command != "mackerel-plugin-memcached --host 127.0.0.1 --port 11211" {
+		t.Error("unexpected command", cmp.Command)
 	}
-	if driver, ok := (mp.PluginDriver).(*sardine.CloudWatchDriver); ok {
-		if len(driver.Dimensions) != 2 {
-			t.Errorf("unexpected dimensions len expected:2 got:%d", len(driver.Dimensions))
-		}
-	} else {
-		t.Errorf("failed assertion: mp.PluginDriver expected *sardine.CloudWatchDriver")
+	if len(cmp.Dimensions) != 2 {
+		t.Errorf("unexpected dimensions len expected:2 got:%d", len(cmp.Dimensions))
 	}
-	if mp.Interval != 10*time.Second {
-		t.Errorf("unexpected interval expected:10s got:%s", mp.Interval)
+	if cmp.Interval != 10*time.Second {
+		t.Errorf("unexpected interval expected:10s got:%s", cmp.Interval)
 	}
-	if mp.Timeout != 15*time.Second {
-		t.Errorf("unexpected timeout expected:15s got:%s", mp.Timeout)
+	if cmp.Timeout != 15*time.Second {
+		t.Errorf("unexpected timeout expected:15s got:%s", cmp.Timeout)
 	}
 
 	cp := c.CheckPlugins["memcached"]
 	if cp.Command != "sh -c 'echo version | nc 127.0.0.1 11211'" {
-		t.Error("unexpected command", mp.Command)
+		t.Error("unexpected command", cp.Command)
 	}
 	if cp.Namespace != "memcached/check" {
 		t.Error("unexpected namespace", cp.Namespace)
@@ -50,16 +46,12 @@ func TestLoadConfig(t *testing.T) {
 		t.Errorf("unexpected timeout expected:1m got:%s", cp.Timeout)
 	}
 
-	msp := c.MackerelDriver["redis"].MetricPlugin
-	if msp.Command != "mackerel-plugin-redis" {
-		t.Error("unexpected command", msp.Command)
+	mmp := c.MackerelMetricPlugins["redis"]
+	if mmp.Command != "mackerel-plugin-redis" {
+		t.Error("unexpected command", mmp.Command)
 	}
-	if driver, ok := (msp.PluginDriver).(*sardine.MackerelDriver); ok {
-		if driver.Service != "production" {
-			t.Error("unexpected service", driver.Service)
-		}
-	} else {
-		t.Errorf("failed assertion: msp.PluginDriver expected *sardine.MackerelDriver")
+	if mmp.Service != "production" {
+		t.Error("unexpected service", mmp.Service)
 	}
 }
 

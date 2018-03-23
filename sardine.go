@@ -35,10 +35,10 @@ func Run(configPath string) error {
 	go putToCloudWatch(ctx, ch)
 	go putToMackerel(ctx, conf, mch)
 
-	for _, cd := range conf.CloudWatchDriver {
+	for _, cd := range conf.CloudWatchMetricPlugins {
 		go cd.Run(ctx, ch)
 	}
-	for _, md := range conf.MackerelDriver {
+	for _, md := range conf.MackerelMetricPlugins {
 		go md.Run(ctx, mch)
 	}
 	for _, cp := range conf.CheckPlugins {
