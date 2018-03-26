@@ -1,7 +1,6 @@
 package sardine
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -9,12 +8,14 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	config "github.com/kayac/go-config"
+	shellwords "github.com/mattn/go-shellwords"
+	"github.com/pkg/errors"
 )
 
 type Config struct {
 	Plugin        map[string]map[string]*PluginConfig
-	MetricPlugins map[string]*MetricPlugin
 	CheckPlugins  map[string]*CheckPlugin
+	MetricPlugins map[string]MetricPlugin
 }
 
 type duration struct {
@@ -28,11 +29,13 @@ func (d *duration) UnmarshalText(text []byte) error {
 }
 
 type PluginConfig struct {
-	Namespace  string
-	Command    string
-	Timeout    duration
-	Interval   duration
-	Dimensions []*Dimension
+	Namespace   string
+	Command     string
+	Timeout     duration
+	Interval    duration
+	Dimensions  []*Dimension
+	Destination string
+	Service     string
 }
 
 type Dimension string
@@ -54,28 +57,61 @@ func (d *Dimension) CloudWatchDimensions() ([]*cloudwatch.Dimension, error) {
 	return ds, nil
 }
 
-func (pc *PluginConfig) NewMetricPlugin(id string) (*MetricPlugin, error) {
+func (pc *PluginConfig) NewCloudWatchMetricPlugin(id string) (*CloudWatchMetricPlugin, error) {
 	if pc.Command == "" {
 		return nil, errors.New("command required")
 	}
-	mp := &MetricPlugin{
-		ID:       fmt.Sprintf("plugin.metrics.%s", id),
-		Command:  pc.Command,
-		Timeout:  pc.Timeout.Duration,
-		Interval: pc.Interval.Duration,
+	args, err := shellwords.Parse(pc.Command)
+	if err != nil {
+		return nil, errors.Wrap(err, "parse command failed")
 	}
+	dimensions := [][]*cloudwatch.Dimension{}
 	for _, d := range pc.Dimensions {
 		if ds, err := d.CloudWatchDimensions(); err != nil {
 			return nil, err
 		} else {
-			mp.Dimensions = append(mp.Dimensions, ds)
+			dimensions = append(dimensions, ds)
 		}
 	}
-	if mp.Timeout == 0 {
-		mp.Timeout = DefaultCommandTimeout
+	mp := &CloudWatchMetricPlugin{
+		id:         fmt.Sprintf("plugin.metrics.%s", id),
+		command:    args,
+		timeout:    pc.Timeout.Duration,
+		interval:   pc.Interval.Duration,
+		Dimensions: dimensions,
 	}
-	if mp.Interval == 0 {
-		mp.Interval = DefaultInterval
+	if mp.timeout == 0 {
+		mp.timeout = DefaultCommandTimeout
+	}
+	if mp.interval == 0 {
+		mp.interval = DefaultInterval
+	}
+	return mp, nil
+}
+
+func (pc *PluginConfig) NewMackerelMetricPlugin(id string) (*MackerelMetricPlugin, error) {
+	if pc.Command == "" {
+		return nil, errors.New("command required")
+	}
+	if pc.Service == "" {
+		return nil, errors.New("service required")
+	}
+	args, err := shellwords.Parse(pc.Command)
+	if err != nil {
+		return nil, errors.Wrap(err, "parse command failed")
+	}
+	mp := &MackerelMetricPlugin{
+		id:       fmt.Sprintf("plugin.servicemetrics.%s", id),
+		command:  args,
+		timeout:  pc.Timeout.Duration,
+		interval: pc.Interval.Duration,
+		Service:  pc.Service,
+	}
+	if mp.timeout == 0 {
+		mp.timeout = DefaultCommandTimeout
+	}
+	if mp.interval == 0 {
+		mp.interval = DefaultInterval
 	}
 	return mp, nil
 }
@@ -87,11 +123,14 @@ func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
 	if pc.Command == "" {
 		return nil, errors.New("command required")
 	}
-
+	args, err := shellwords.Parse(pc.Command)
+	if err != nil {
+		return nil, errors.Wrap(err, "parse command failed")
+	}
 	cp := &CheckPlugin{
 		ID:        fmt.Sprintf("plugin.check.%s", id),
 		Namespace: pc.Namespace,
-		Command:   pc.Command,
+		Command:   args,
 		Timeout:   pc.Timeout.Duration,
 		Interval:  pc.Interval.Duration,
 	}
@@ -112,22 +151,35 @@ func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
 }
 
 func LoadConfig(path string) (*Config, error) {
-	c := Config{
-		MetricPlugins: make(map[string]*MetricPlugin),
+	c := &Config{
 		CheckPlugins:  make(map[string]*CheckPlugin),
+		MetricPlugins: make(map[string]MetricPlugin),
 	}
+
 	if err := config.LoadWithEnvTOML(&c, path); err != nil {
 		return nil, err
 	}
+
 	for key, value := range c.Plugin {
 		switch key {
 		case "metrics":
 			for id, pc := range value {
-				mp, err := pc.NewMetricPlugin(id)
-				if err != nil {
-					return nil, err
+				switch strings.ToLower(pc.Destination) {
+				case "mackerel":
+					d, err := pc.NewMackerelMetricPlugin(id)
+					if err != nil {
+						return nil, err
+					}
+					c.MetricPlugins[id] = d
+				case "cloudwatch", "":
+					d, err := pc.NewCloudWatchMetricPlugin(id)
+					if err != nil {
+						return nil, err
+					}
+					c.MetricPlugins[id] = d
+				default:
+					return nil, fmt.Errorf("destination %s is not allowed. use cloudwatch or mackerel")
 				}
-				c.MetricPlugins[id] = mp
 			}
 		case "check":
 			for id, pc := range value {
@@ -142,5 +194,6 @@ func LoadConfig(path string) (*Config, error) {
 		}
 	}
 	c.Plugin = nil
-	return &c, nil
+
+	return c, nil
 }
