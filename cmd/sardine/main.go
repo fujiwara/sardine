@@ -11,6 +11,11 @@ import (
 
 func main() {
 	var config string
+
+	// Set a default format. XXX mackerel-client modifies global flags.
+	// https://github.com/mackerelio/mackerel-client-go/issues/57
+	log.SetFlags(log.LstdFlags)
+
 	flag.StringVar(&config, "config", "", "config file path")
 	flag.BoolVar(&sardine.Debug, "debug", false, "enable debug logging")
 	flag.VisitAll(envToFlag)
