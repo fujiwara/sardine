@@ -9,7 +9,32 @@
 
 [[projects]]
   name = "github.com/aws/aws-sdk-go"
-  packages = ["aws","aws/awserr","aws/awsutil","aws/client","aws/client/metadata","aws/corehandlers","aws/credentials","aws/credentials/ec2rolecreds","aws/credentials/endpointcreds","aws/credentials/stscreds","aws/defaults","aws/ec2metadata","aws/endpoints","aws/request","aws/session","aws/signer/v4","internal/shareddefaults","private/protocol","private/protocol/query","private/protocol/query/queryutil","private/protocol/rest","private/protocol/xml/xmlutil","service/cloudwatch","service/sts"]
+  packages = [
+    "aws",
+    "aws/awserr",
+    "aws/awsutil",
+    "aws/client",
+    "aws/client/metadata",
+    "aws/corehandlers",
+    "aws/credentials",
+    "aws/credentials/ec2rolecreds",
+    "aws/credentials/endpointcreds",
+    "aws/credentials/stscreds",
+    "aws/defaults",
+    "aws/ec2metadata",
+    "aws/endpoints",
+    "aws/request",
+    "aws/session",
+    "aws/signer/v4",
+    "internal/shareddefaults",
+    "private/protocol",
+    "private/protocol/query",
+    "private/protocol/query/queryutil",
+    "private/protocol/rest",
+    "private/protocol/xml/xmlutil",
+    "service/cloudwatch",
+    "service/sts"
+  ]
   revision = "388e6676807f5968ad5eaaec0c70002f80c20b84"
   version = "v1.12.39"
 
@@ -29,6 +54,12 @@
   name = "github.com/kayac/go-config"
   packages = ["."]
   revision = "762bc25448755c6ccfe0265ed3013c9d507569c5"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/mackerelio/mackerel-client-go"
+  packages = ["."]
+  revision = "f8d2a23df607c93fe287c259576a408141fbf116"
 
 [[projects]]
   name = "github.com/mattn/go-shellwords"
@@ -51,6 +82,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f31b2673c855749f943621f0c1d1c2d9c39a0e12443393b5ffe2d86a9e8fded0"
+  inputs-digest = "fc26534f47cd1eef555d0bc9f2bf7b0a7bc14566f7da169172076bbf813b18da"
   solver-name = "gps-cdcl"
   solver-version = 1

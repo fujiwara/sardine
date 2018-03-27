@@ -9,14 +9,13 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
-	shellwords "github.com/mattn/go-shellwords"
 	"github.com/pkg/errors"
 )
 
 type CheckPlugin struct {
 	ID         string
 	Namespace  string
-	Command    string
+	Command    []string
 	Timeout    time.Duration
 	Interval   time.Duration
 	Dimensions [][]*cloudwatch.Dimension
@@ -77,13 +76,7 @@ func (cp *CheckPlugin) Execute(_ctx context.Context) (CheckResult, error) {
 
 	ctx, cancel := context.WithTimeout(_ctx, cp.Timeout)
 	defer cancel()
-
-	args, err := shellwords.Parse(cp.Command)
-	if err != nil {
-		return CheckUnknown, errors.Wrap(err, "parse command failed")
-	}
-
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	cmd := exec.CommandContext(ctx, cp.Command[0], cp.Command[1:]...)
 	stdoutStderr, err := cmd.CombinedOutput()
 	if err == nil {
 		return CheckOK, nil

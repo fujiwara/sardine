@@ -2,13 +2,16 @@ package sardine
 
 import (
 	"context"
+	"encoding/json"
 	"log"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	mackerel "github.com/mackerelio/mackerel-client-go"
 )
 
 var (
@@ -18,6 +21,8 @@ var (
 )
 
 func Run(configPath string) error {
+	cch := make(chan *cloudwatch.PutMetricDataInput, 1000)
+	mch := make(chan ServiceMetric, 1000)
 	conf, err := LoadConfig(configPath)
 	if err != nil {
 		return err
@@ -28,15 +33,22 @@ func Run(configPath string) error {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	ch := make(chan *cloudwatch.PutMetricDataInput, 1000)
-	go putToCloudWatch(ctx, ch)
+	go putToCloudWatch(ctx, cch)
+	go putToMackerel(ctx, mch)
 
-	for _, mp := range conf.MetricPlugins {
-		go mp.Run(ctx, ch)
+	for _, _mp := range conf.MetricPlugins {
+		switch mp := _mp.(type) {
+		case *CloudWatchMetricPlugin:
+			mp.Ch = cch
+			go runMetricPlugin(ctx, mp)
+		case *MackerelMetricPlugin:
+			mp.Ch = mch
+			go runMetricPlugin(ctx, mp)
+		}
 		time.Sleep(time.Second)
 	}
 	for _, cp := range conf.CheckPlugins {
-		go cp.Run(ctx, ch)
+		go cp.Run(ctx, cch)
 		time.Sleep(time.Second)
 	}
 
@@ -54,11 +66,32 @@ func putToCloudWatch(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput
 			return
 		case in := <-ch:
 			if Debug {
-				log.Println("put", in)
+				b, _ := json.Marshal(in)
+				log.Printf("putToCloudWatch: %s", b)
 			}
 			_, err := svc.PutMetricDataWithContext(ctx, in, request.WithResponseReadTimeout(30*time.Second))
 			if err != nil {
-				log.Println("putMetricData failed:", err)
+				log.Println("PutMetricData to CloudWatch failed:", err)
+			}
+		}
+	}
+}
+
+func putToMackerel(ctx context.Context, ch chan ServiceMetric) {
+	c := mackerel.NewClient(os.Getenv("MACKEREL_APIKEY"))
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case in := <-ch:
+			if Debug {
+				b, _ := json.Marshal(in)
+				log.Printf("putToMackerel: %s", b)
+			}
+			err := c.PostServiceMetricValues(in.Service, in.MetricValues)
+			if err != nil {
+				log.Println("PostServiceMetricValues to Mackerel failed:", err)
 			}
 		}
 	}

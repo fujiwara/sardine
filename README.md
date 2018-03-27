@@ -1,6 +1,6 @@
 # sardine
 
-Mackerel plugin metrics aggregator with CloudWatch.
+Mackerel plugin metrics aggregator with CloudWatch / Mackerel service.
 
 ## Configuration
 
@@ -59,6 +59,19 @@ sardine works as below.
      - 2 : CheckWarning
      - other : CheckUnknown
    - metric Value is always 1
+
+## Post metrics to Mackerel service.
+
+sardine also can post metrics to [Mackerel](https://mackerel.io) service.
+
+```toml
+[plugin.metrics.memcached]
+command     = "mackerel-plugin-memcached --host localhost --port 11211"
+destination = "Mackerel"
+service     = "MyService"
+```
+
+API key will be load from `MACKEREL_APIKEY` environment variable.
 
 ## Author
 
