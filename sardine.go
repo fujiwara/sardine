@@ -2,6 +2,7 @@ package sardine
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
 	"sync"
@@ -65,7 +66,8 @@ func putToCloudWatch(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput
 			return
 		case in := <-ch:
 			if Debug {
-				log.Println("putToCloudWatch", in)
+				b, _ := json.Marshal(in)
+				log.Printf("putToCloudWatch: %s", b)
 			}
 			_, err := svc.PutMetricDataWithContext(ctx, in, request.WithResponseReadTimeout(30*time.Second))
 			if err != nil {
@@ -84,7 +86,8 @@ func putToMackerel(ctx context.Context, ch chan ServiceMetric) {
 			return
 		case in := <-ch:
 			if Debug {
-				log.Println("putToMackerel", in)
+				b, _ := json.Marshal(in)
+				log.Printf("putToMackerel: %s", b)
 			}
 			err := c.PostServiceMetricValues(in.Service, in.MetricValues)
 			if err != nil {
