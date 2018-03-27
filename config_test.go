@@ -15,16 +15,16 @@ func TestLoadConfig(t *testing.T) {
 	}
 	cmp := c.MetricPlugins["memcached"].(*sardine.CloudWatchMetricPlugin)
 	if !reflect.DeepEqual(cmp.Command(), []string{"mackerel-plugin-memcached", "--host", "127.0.0.1", "--port", "11211"}) {
-		t.Error("unexpected command", cmp.Command)
+		t.Errorf("unexpected command %#v", cmp.Command())
 	}
 	if len(cmp.Dimensions) != 2 {
 		t.Errorf("unexpected dimensions len expected:2 got:%d", len(cmp.Dimensions))
 	}
 	if cmp.Interval() != 10*time.Second {
-		t.Errorf("unexpected interval expected:10s got:%s", cmp.Interval)
+		t.Errorf("unexpected interval expected:10s got:%s", cmp.Interval())
 	}
 	if cmp.Timeout() != 15*time.Second {
-		t.Errorf("unexpected timeout expected:15s got:%s", cmp.Timeout)
+		t.Errorf("unexpected timeout expected:15s got:%s", cmp.Timeout())
 	}
 
 	cp := c.CheckPlugins["memcached"]
@@ -46,10 +46,10 @@ func TestLoadConfig(t *testing.T) {
 
 	mmp := c.MetricPlugins["redis"].(*sardine.MackerelMetricPlugin)
 	if !reflect.DeepEqual(mmp.Command(), []string{"mackerel-plugin-redis"}) {
-		t.Error("unexpected command", mmp.Command)
+		t.Errorf("unexpected command %#v", mmp.Command())
 	}
 	if mmp.Service != "production" {
-		t.Error("unexpected service", mmp.Service)
+		t.Errorf("unexpected service %s", mmp.Service)
 	}
 }
 

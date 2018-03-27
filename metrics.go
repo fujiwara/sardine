@@ -191,7 +191,7 @@ func runMetricPlugin(ctx context.Context, mp MetricPlugin) {
 	for {
 		metrics, err := executeCommand(ctx, mp)
 		if err != nil {
-			log.Printf("[%s] %s", mp.ID, err)
+			log.Printf("[%s] %s", mp.ID(), err)
 		}
 		mp.Enqueue(metrics)
 

@@ -178,7 +178,7 @@ func LoadConfig(path string) (*Config, error) {
 					}
 					c.MetricPlugins[id] = d
 				default:
-					return nil, fmt.Errorf("destination %s is not allowed. use cloudwatch or mackerel")
+					return nil, fmt.Errorf("destination %s is not allowed. use cloudwatch or mackerel", pc.Destination)
 				}
 			}
 		case "check":
