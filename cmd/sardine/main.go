@@ -5,12 +5,14 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/fujiwara/sardine"
 )
 
 func main() {
 	var config string
+	var sleep time.Duration
 
 	// Set a default format. XXX mackerel-client modifies global flags.
 	// https://github.com/mackerelio/mackerel-client-go/issues/57
@@ -18,8 +20,15 @@ func main() {
 
 	flag.StringVar(&config, "config", "", "config file path")
 	flag.BoolVar(&sardine.Debug, "debug", false, "enable debug logging")
+	flag.DurationVar(&sleep, "sleep", 0, "sleep duration at wake up")
 	flag.VisitAll(envToFlag)
 	flag.Parse()
+
+	log.Println("starting sardine agent")
+	if sleep > 0 {
+		log.Printf("sleeping %s", sleep)
+		time.Sleep(sleep)
+	}
 	err := sardine.Run(config)
 	if err != nil {
 		log.Println(err)
