@@ -2,7 +2,22 @@
 
 Mackerel plugin metrics aggregator with CloudWatch / Mackerel service.
 
+## Usage
+
+```
+Usage of sardine:
+  -config string
+    	config file path
+  -debug
+    	enable debug logging
+  -sleep duration
+    	sleep duration at wake up
+```
+
+- `-sleep` accepts a string which can be parsed by [`time.ParseDuration()`](https://golang.org/pkg/time/#ParseDuration) e.g. `10s`
+
 ## Configuration
+
 
 ```toml
 # config.toml
