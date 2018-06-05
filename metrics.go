@@ -82,10 +82,21 @@ func (mp *CloudWatchMetricPlugin) Enqueue(metrics []*Metric) {
 		// no dimension metric
 		mds[ns] = append(mds[ns], metric.NewMetricDatum(nil))
 	}
-	for ns, data := range mds {
-		mp.Ch <- &cloudwatch.PutMetricDataInput{
-			Namespace:  aws.String(ns),
-			MetricData: data,
+	for ns, md := range mds {
+		// split MetricDatum/20
+		for i := 0; i <= len(md)/maxMetricDatum; i++ {
+			first := i * maxMetricDatum
+			last := first + maxMetricDatum
+			if last > len(md) {
+				last = len(md)
+			}
+			if len(md[first:last]) == 0 {
+				break
+			}
+			mp.Ch <- &cloudwatch.PutMetricDataInput{
+				Namespace:  aws.String(ns),
+				MetricData: md[first:last],
+			}
 		}
 	}
 }

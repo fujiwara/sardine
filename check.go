@@ -57,9 +57,20 @@ func (cp *CheckPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDat
 		// no dimension metric
 		md = append(md, res.NewMetricDatum(nil, now))
 
-		ch <- &cloudwatch.PutMetricDataInput{
-			Namespace:  aws.String(cp.Namespace),
-			MetricData: md,
+		// split MetricDatum/20
+		for i := 0; i <= len(md)/maxMetricDatum; i++ {
+			first := i * maxMetricDatum
+			last := first + maxMetricDatum
+			if last > len(md) {
+				last = len(md)
+			}
+			if len(md[first:last]) == 0 {
+				break
+			}
+			ch <- &cloudwatch.PutMetricDataInput{
+				Namespace:  aws.String(cp.Namespace),
+				MetricData: md[first:last],
+			}
 		}
 
 		select {

@@ -18,6 +18,8 @@ var (
 	Debug                 = false
 	DefaultInterval       = time.Minute
 	DefaultCommandTimeout = time.Minute
+
+	maxMetricDatum = 20
 )
 
 func Run(configPath string) error {
