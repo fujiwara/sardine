@@ -42,12 +42,12 @@ func (r CheckResult) NewMetricDatum(ds []*cloudwatch.Dimension, ts time.Time) *c
 
 func (cp *CheckPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
 	ticker := time.NewTicker(cp.Interval)
-	log.Printf("[%s] starting", cp.ID)
+	log.Printf("[info][%s] starting", cp.ID)
 	now := time.Now()
 	for {
 		res, err := cp.Execute(ctx)
 		if err != nil {
-			log.Printf("[%s] %s %s", cp.ID, res, err)
+			log.Printf("[warn][%s] %s %s", cp.ID, res, err)
 		}
 
 		md := make([]*cloudwatch.MetricDatum, 0, len(cp.Dimensions)+1)
@@ -95,7 +95,7 @@ func (cp *CheckPlugin) Execute(_ctx context.Context) (CheckResult, error) {
 
 	// exit != 0
 	if len(stdoutStderr) > 0 {
-		log.Printf("[%s] %s", cp.ID, stdoutStderr)
+		log.Printf("[warn][%s] %s", cp.ID, stdoutStderr)
 	}
 	if e2, ok := err.(*exec.ExitError); ok {
 		if s, ok := e2.Sys().(syscall.WaitStatus); ok {

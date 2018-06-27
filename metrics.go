@@ -198,11 +198,11 @@ func (mp *MackerelMetricPlugin) ParseMetricLine(b string) (*Metric, error) {
 
 func runMetricPlugin(ctx context.Context, mp MetricPlugin) {
 	ticker := time.NewTicker(mp.Interval())
-	log.Printf("[%s] starting", mp.ID())
+	log.Printf("[info][%s] starting", mp.ID())
 	for {
 		metrics, err := executeCommand(ctx, mp)
 		if err != nil {
-			log.Printf("[%s] %s", mp.ID(), err)
+			log.Printf("[warn][%s] %s", mp.ID(), err)
 		}
 		mp.Enqueue(metrics)
 
@@ -240,7 +240,7 @@ func executeCommand(ctx context.Context, mp MetricPlugin) ([]*Metric, error) {
 	for scanner.Scan() {
 		m, err := mp.ParseMetricLine(scanner.Text())
 		if err != nil {
-			log.Println(err)
+			log.Println("[warn]", err)
 			continue
 		}
 		metrics = append(metrics, m)

@@ -24,14 +24,14 @@ func main() {
 	flag.VisitAll(envToFlag)
 	flag.Parse()
 
-	log.Println("starting sardine agent")
+	log.Println("[info] starting sardine agent")
 	if sleep > 0 {
-		log.Printf("sleeping %s", sleep)
+		log.Printf("[info] sleeping %s", sleep)
 		time.Sleep(sleep)
 	}
 	err := sardine.Run(config)
 	if err != nil {
-		log.Println(err)
+		log.Println("[error]", err)
 		os.Exit(1)
 	}
 }
