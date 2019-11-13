@@ -1,23 +1,14 @@
 LATEST_TAG := $(shell git describe --abbrev=0 --tags)
 
-setup:
-	go get \
-		github.com/laher/goxc \
-		github.com/tcnksm/ghr \
-		github.com/golang/lint/golint \
-		github.com/golang/dep/cmd/dep
-	go get -d -t ./...
-	dep ensure
-
-test: setup
+test:
 	go test -v ./...
 
-lint: setup
+lint:
 	go vet ./...
 	golint -set_exit_status ./...
 
-dist: setup
-	goxc
+dist:
+	CGO_ENABLED=0 goxz -pv=$(LATEST_TAG) -os=darwin,linux,windows -build-ldflags="-w -s" -arch=amd64 -d=dist -z ./cmd/sardine
 
 clean:
 	rm -fr dist/*
