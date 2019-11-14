@@ -69,11 +69,11 @@ func putToCloudWatch(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput
 		case in := <-ch:
 			if Debug {
 				b, _ := json.Marshal(in)
-				log.Printf("putToCloudWatch: %s", b)
+				log.Printf("[debug] putToCloudWatch: %s", b)
 			}
 			_, err := svc.PutMetricDataWithContext(ctx, in, request.WithResponseReadTimeout(30*time.Second))
 			if err != nil {
-				log.Println("PutMetricData to CloudWatch failed:", err)
+				log.Println("[warn] PutMetricData to CloudWatch failed:", err)
 			}
 		}
 	}
@@ -89,11 +89,11 @@ func putToMackerel(ctx context.Context, ch chan ServiceMetric) {
 		case in := <-ch:
 			if Debug {
 				b, _ := json.Marshal(in)
-				log.Printf("putToMackerel: %s", b)
+				log.Printf("[debug] putToMackerel: %s", b)
 			}
 			err := c.PostServiceMetricValues(in.Service, in.MetricValues)
 			if err != nil {
-				log.Println("PostServiceMetricValues to Mackerel failed:", err)
+				log.Println("[warn] PostServiceMetricValues to Mackerel failed:", err)
 			}
 		}
 	}
