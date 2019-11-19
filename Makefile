@@ -19,7 +19,7 @@ clean:
 	rm -fr dist/* cmd/sardine/sardine
 
 release: dist
-	ghr -u fujiwara -r sardine $(LATEST_TAG) dist/snapshot/
+	ghr -u fujiwara -r sardine $(LATEST_TAG) dist/
 
 cmd/sardine/sardine: *.go go.* cmd/sardine/*.go
 	cd cmd/sardine && go build .
