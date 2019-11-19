@@ -2,6 +2,7 @@ package sardine
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os/exec"
 	"syscall"
@@ -100,14 +101,17 @@ func (cp *CheckPlugin) Execute(ctx context.Context) (CheckResult, error) {
 	if status.IsTimedOut() || status.IsKilled() {
 		return CheckUnknown, errors.New("command execute timed out")
 	}
-	if err == nil {
+	if err != nil {
+		return CheckUnknown, errors.Wrap(err, "command execute failed")
+	}
+
+	st := status.GetExitCode()
+	switch st {
+	case 0:
 		return CheckOK, nil
+	case int(CheckFailed), int(CheckWarning):
+		return CheckResult(st), err
+	default:
+		return CheckUnknown, fmt.Errorf("command execute failed with exit code %d", st)
 	}
-	if st := status.GetExitCode(); st != 0 {
-		if st == int(CheckFailed) || st == int(CheckWarning) {
-			return CheckResult(st), err
-		}
-		return CheckUnknown, errors.Wrapf(err, "command execute failed with exit code %d", st)
-	}
-	return CheckUnknown, errors.Wrap(err, "command execute failed")
 }
