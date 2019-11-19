@@ -4,9 +4,19 @@ package sardine
 
 import "strconv"
 
-const _CheckResult_name = "CheckOKCheckFailedCheckWarning"
+func _() {
+	// An "invalid array index" compiler error signifies that the constant values have changed.
+	// Re-run the stringer command to generate them again.
+	var x [1]struct{}
+	_ = x[CheckOK-0]
+	_ = x[CheckFailed-1]
+	_ = x[CheckWarning-2]
+	_ = x[CheckUnknown-3]
+}
 
-var _CheckResult_index = [...]uint8{0, 7, 18, 30}
+const _CheckResult_name = "CheckOKCheckFailedCheckWarningCheckUnknown"
+
+var _CheckResult_index = [...]uint8{0, 7, 18, 30, 42}
 
 func (i CheckResult) String() string {
 	if i < 0 || i >= CheckResult(len(_CheckResult_index)-1) {

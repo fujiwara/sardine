@@ -5,12 +5,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Songmu/timeout"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	mackerel "github.com/mackerelio/mackerel-client-go"
@@ -216,27 +216,26 @@ func runMetricPlugin(ctx context.Context, mp MetricPlugin) {
 }
 
 func executeCommand(ctx context.Context, mp MetricPlugin) ([]*Metric, error) {
-	var (
-		err     error
-		metrics []*Metric
-	)
-
-	ctx, cancel := context.WithTimeout(ctx, mp.Timeout())
-	defer cancel()
+	var metrics []*Metric
 
 	args := mp.Command()
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
-	cmd.Stderr = os.Stderr
-	stdout, err := cmd.StdoutPipe()
+	tio := &timeout.Timeout{
+		Duration:  mp.Timeout(),
+		KillAfter: 5 * time.Second,
+		Cmd:       exec.Command(args[0], args[1:]...),
+	}
+	status, stdout, stderr, err := tio.Run()
+	if len(stderr) > 0 {
+		log.Printf("[%s] %s", mp.ID(), stderr)
+	}
 	if err != nil {
-		return nil, errors.Wrap(err, "stdout open failed")
+		return nil, errors.Wrapf(err, "command execute failed with exit code %d", status.GetExitCode())
 	}
-	scanner := bufio.NewScanner(stdout)
-
-	if err := cmd.Start(); err != nil {
-		return nil, errors.Wrap(err, "command execute failed1")
+	if status.IsTimedOut() || status.IsKilled() {
+		return nil, errors.New("command execute timed out")
 	}
 
+	scanner := bufio.NewScanner(strings.NewReader(stdout))
 	for scanner.Scan() {
 		m, err := mp.ParseMetricLine(scanner.Text())
 		if err != nil {
@@ -245,11 +244,5 @@ func executeCommand(ctx context.Context, mp MetricPlugin) ([]*Metric, error) {
 		}
 		metrics = append(metrics, m)
 	}
-
-	err = cmd.Wait()
-	if e, ok := err.(*exec.ExitError); ok {
-		return nil, errors.Wrap(e, "command execute failed")
-	}
-
 	return metrics, err
 }

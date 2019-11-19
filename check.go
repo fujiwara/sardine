@@ -2,11 +2,13 @@ package sardine
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os/exec"
 	"syscall"
 	"time"
 
+	"github.com/Songmu/timeout"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/pkg/errors"
@@ -82,31 +84,34 @@ func (cp *CheckPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDat
 	}
 }
 
-func (cp *CheckPlugin) Execute(_ctx context.Context) (CheckResult, error) {
-	var err error
+func (cp *CheckPlugin) Execute(ctx context.Context) (CheckResult, error) {
+	tio := &timeout.Timeout{
+		Duration:  cp.Timeout,
+		KillAfter: 5 * time.Second,
+		Signal:    syscall.SIGTERM,
+		Cmd:       exec.Command(cp.Command[0], cp.Command[1:]...),
+	}
+	status, stdout, stderr, err := tio.Run()
+	if len(stdout) > 0 {
+		log.Printf("[%s] %s", cp.ID, stdout)
+	}
+	if len(stderr) > 0 {
+		log.Printf("[%s] %s", cp.ID, stderr)
+	}
+	if status.IsTimedOut() || status.IsKilled() {
+		return CheckUnknown, errors.New("command execute timed out")
+	}
+	if err != nil {
+		return CheckUnknown, errors.Wrap(err, "command execute failed")
+	}
 
-	ctx, cancel := context.WithTimeout(_ctx, cp.Timeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, cp.Command[0], cp.Command[1:]...)
-	stdoutStderr, err := cmd.CombinedOutput()
-	if err == nil {
+	st := status.GetExitCode()
+	switch st {
+	case 0:
 		return CheckOK, nil
+	case int(CheckFailed), int(CheckWarning):
+		return CheckResult(st), err
+	default:
+		return CheckUnknown, fmt.Errorf("command execute failed with exit code %d", st)
 	}
-
-	// exit != 0
-	if len(stdoutStderr) > 0 {
-		log.Printf("[%s] %s", cp.ID, stdoutStderr)
-	}
-	if e2, ok := err.(*exec.ExitError); ok {
-		if s, ok := e2.Sys().(syscall.WaitStatus); ok {
-			if st := s.ExitStatus(); st == int(CheckFailed) || st == int(CheckWarning) {
-				return CheckResult(st), err
-			} else {
-				return CheckUnknown, errors.Wrap(err, "command execute failed")
-			}
-		} else {
-			panic(errors.New("unimplemented for system where exec.ExitError.Sys() is not syscall.WaitStatus."))
-		}
-	}
-	return CheckUnknown, errors.Wrap(err, "command execute failed")
 }
