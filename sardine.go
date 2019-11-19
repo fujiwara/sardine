@@ -87,6 +87,9 @@ func putToMackerel(ctx context.Context, ch chan ServiceMetric) {
 		case <-ctx.Done():
 			return
 		case in := <-ch:
+			if len(in.MetricValues) == 0 {
+				continue
+			}
 			if Debug {
 				b, _ := json.Marshal(in)
 				log.Printf("putToMackerel: %s", b)

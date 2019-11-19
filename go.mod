@@ -3,6 +3,7 @@ module github.com/fujiwara/sardine
 go 1.13
 
 require (
+	github.com/Songmu/timeout v0.4.0
 	github.com/aws/aws-sdk-go v1.25.32
 	github.com/kayac/go-config v0.1.0
 	github.com/kr/pretty v0.1.0 // indirect

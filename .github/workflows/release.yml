@@ -23,8 +23,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        export PATH=~/go/bin:$PATH
-        curl -sL https://github.com/Songmu/goxz/releases/download/v0.4.1/goxz_v0.4.1_linux_amd64.tar.gz | tar zxvf - && install goxz_v0.4.1_linux_amd64/goxz ~/go/bin/
-        curl -sL https://github.com/tcnksm/ghr/releases/download/v0.13.0/ghr_v0.13.0_linux_amd64.tar.gz | tar zxvf - && install ghr_v0.13.0_linux_amd64/ghr ~/go/bin/
+        mkdir ~/bin
+        export PATH=~/bin:$PATH
+        curl -sL https://github.com/Songmu/goxz/releases/download/v0.4.1/goxz_v0.4.1_linux_amd64.tar.gz | tar zxvf - && install goxz_v0.4.1_linux_amd64/goxz ~/bin/
+        curl -sL https://github.com/tcnksm/ghr/releases/download/v0.13.0/ghr_v0.13.0_linux_amd64.tar.gz | tar zxvf - && install ghr_v0.13.0_linux_amd64/ghr ~/bin/
         make dist
         make release
