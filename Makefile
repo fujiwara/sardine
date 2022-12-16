@@ -8,23 +8,24 @@ stringer:
 test:
 	go test -v ./...
 
-lint:
-	go vet ./...
-	golint -set_exit_status ./...
-
 dist:
-	CGO_ENABLED=0 goxz -pv=$(LATEST_TAG) -os=darwin,linux,windows -build-ldflags="-w -s" -arch=amd64 -d=dist -z ./cmd/sardine
+	goreleaser build --snapshot --rm-dist
 
 clean:
 	rm -fr dist/* cmd/sardine/sardine
 
-release: dist
-	ghr -u fujiwara -r sardine $(LATEST_TAG) dist/snapshot/
+install:
+	go install .
 
-cmd/sardine/sardine: *.go go.* cmd/sardine/*.go
-	cd cmd/sardine && go build .
-
-install: cmd/sardine/sardine
-	install cmd/sardine/sardine $(GOPATH)/bin
+release-image: dist/
+	cd dist && ln -sf sardine_linux_amd64_v1 sardine_linux_amd64 && cd -
+	find dist/ -type f
+	docker buildx build \
+		--build-arg VERSION=${GIT_VER} \
+		--platform linux/amd64,linux/arm64 \
+		-f Dockerfile \
+		-t ghcr.io/fujiwara/sardine:${GIT_VER} \
+		--push \
+		.
 
 .PHONY: packages test lint clean setup dist install
