@@ -18,6 +18,7 @@ var trapSignals = []os.Signal{os.Interrupt, unix.SIGTERM}
 func main() {
 	var config string
 	var sleep time.Duration
+	var atOnce bool
 
 	// Set a default format. XXX mackerel-client modifies global flags.
 	// https://github.com/mackerelio/mackerel-client-go/issues/57
@@ -26,6 +27,7 @@ func main() {
 	flag.StringVar(&config, "config", "", "config file path")
 	flag.BoolVar(&sardine.Debug, "debug", false, "enable debug logging")
 	flag.DurationVar(&sleep, "sleep", 0, "sleep duration at wake up")
+	flag.BoolVar(&atOnce, "at-once", false, "run at once and exit")
 	flag.VisitAll(envToFlag)
 	flag.Parse()
 
@@ -38,7 +40,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), trapSignals...)
 	defer stop()
 
-	err := sardine.Run(ctx, config)
+	var err error
+	if atOnce {
+		log.Println("run at once")
+		err = sardine.RunAtOnce(ctx, config)
+	} else {
+		log.Println("running daemon")
+		err = sardine.Run(ctx, config)
+	}
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)

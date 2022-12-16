@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"sync"
 	"syscall"
 	"time"
 
@@ -42,46 +43,52 @@ func (r CheckResult) NewMetricDatum(ds []types.Dimension, ts time.Time) types.Me
 	}
 }
 
-func (cp *CheckPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
+func (cp *CheckPlugin) Run(ctx context.Context, wg *sync.WaitGroup, ch chan *cloudwatch.PutMetricDataInput) {
+	defer wg.Done()
 	ticker := time.NewTicker(cp.Interval)
 	log.Printf("[%s] starting", cp.ID)
-	now := time.Now()
 	for {
-		res, err := cp.Execute(ctx)
-		if err != nil {
-			log.Printf("[%s] %s %s", cp.ID, res, err)
+		if err := cp.RunAtOnce(ctx, ch); err != nil {
+			log.Println(err)
 		}
-
-		md := make([]types.MetricDatum, 0, len(cp.Dimensions)+1)
-		for _, ds := range cp.Dimensions {
-			md = append(md, res.NewMetricDatum(ds, now))
-		}
-		// no dimension metric
-		md = append(md, res.NewMetricDatum(nil, now))
-
-		// split MetricDatum/20
-		for i := 0; i <= len(md)/maxMetricDatum; i++ {
-			first := i * maxMetricDatum
-			last := first + maxMetricDatum
-			if last > len(md) {
-				last = len(md)
-			}
-			if len(md[first:last]) == 0 {
-				break
-			}
-			ch <- &cloudwatch.PutMetricDataInput{
-				Namespace:  aws.String(cp.Namespace),
-				MetricData: md[first:last],
-			}
-		}
-
 		select {
-		case now = <-ticker.C:
-			continue
 		case <-ctx.Done():
 			return
+		case <-ticker.C:
+			continue
 		}
 	}
+}
+
+func (cp *CheckPlugin) RunAtOnce(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) error {
+	res, err := cp.Execute(ctx)
+	if err != nil {
+		return fmt.Errorf("[%s] %s %w", cp.ID, res, err)
+	}
+	now := time.Now()
+	md := make([]types.MetricDatum, 0, len(cp.Dimensions)+1)
+	for _, ds := range cp.Dimensions {
+		md = append(md, res.NewMetricDatum(ds, now))
+	}
+	// no dimension metric
+	md = append(md, res.NewMetricDatum(nil, now))
+
+	// split MetricDatum/20
+	for i := 0; i <= len(md)/maxMetricDatum; i++ {
+		first := i * maxMetricDatum
+		last := first + maxMetricDatum
+		if last > len(md) {
+			last = len(md)
+		}
+		if len(md[first:last]) == 0 {
+			break
+		}
+		ch <- &cloudwatch.PutMetricDataInput{
+			Namespace:  aws.String(cp.Namespace),
+			MetricData: md[first:last],
+		}
+	}
+	return nil
 }
 
 func (cp *CheckPlugin) Execute(ctx context.Context) (CheckResult, error) {

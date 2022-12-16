@@ -1,6 +1,7 @@
 GIT_VER := $(shell git describe --abbrev=0 --tags)
 
-binary: cmd/sardine/sardine
+binary: cmd/sardine/*.go *.go go.mod go.sum
+	go build -o sardine ./cmd/sardine
 
 stringer:
 	stringer -type CheckResult
@@ -12,10 +13,10 @@ dist:
 	goreleaser build --snapshot --rm-dist
 
 clean:
-	rm -fr dist/* cmd/sardine/sardine
+	rm -fr dist/* sardine
 
 install:
-	go install .
+	go install ./cmd/sardine
 
 release-image: dist/
 	cd dist && ln -sf sardine_linux_amd64_v1 sardine_linux_amd64 && cd -
