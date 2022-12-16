@@ -18,6 +18,12 @@ Usage of sardine:
 
 - `-sleep` accepts a string which can be parsed by [`time.ParseDuration()`](https://golang.org/pkg/time/#ParseDuration) e.g. `10s`
 
+Flag values are read from environment variables. For example,
+
+```
+$ SARDINE_AT_ONCE=t SARDINE_CONFIG=config.toml sardine
+```
+
 ## Configuration
 
 
