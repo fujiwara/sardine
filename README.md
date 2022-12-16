@@ -9,7 +9,7 @@ Usage of sardine:
   -at-once
         run at once and exit
   -config string
-        config file path
+        config file path or URL (file, http, https or s3)
   -debug
         enable debug logging
   -sleep duration

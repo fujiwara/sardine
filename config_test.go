@@ -2,6 +2,8 @@ package sardine_test
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
 	"time"
@@ -72,4 +74,17 @@ func TestDimension(t *testing.T) {
 	if *n2 != "Bar" || *v2 != "baz" {
 		t.Errorf("unexpected dimension[1] expected:Bar=baz got:%s=%s", *n2, *v2)
 	}
+}
+
+func TestLoadConfigFromHTTP(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, r.URL.Path[1:])
+	}))
+	defer ts.Close()
+
+	c, err := sardine.LoadConfig(context.Background(), ts.URL+"/test/config.toml")
+	if err != nil {
+		t.Error(err)
+	}
+	t.Logf("%#v", c)
 }

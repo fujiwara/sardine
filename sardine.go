@@ -56,6 +56,8 @@ func Run(ctx context.Context, configPath string) error {
 
 	<-ctx.Done()
 	log.Println("shutting down. waiting for complete...")
+	close(cch)
+	close(mch)
 	wg.Wait()
 	log.Println("shutdown complete")
 	return nil
