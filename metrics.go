@@ -202,12 +202,9 @@ func runMetricPlugin(ctx context.Context, wg *sync.WaitGroup, mp MetricPlugin) {
 	ticker := time.NewTicker(mp.Interval())
 	log.Printf("[%s] starting", mp.ID())
 	for {
-		metrics, err := executeCommand(ctx, mp)
-		if err != nil {
-			log.Printf("[%s] %s", mp.ID(), err)
+		if err := runMetricPluginAtOnce(ctx, mp); err != nil {
+			log.Println(err)
 		}
-		mp.Enqueue(metrics)
-
 		select {
 		case <-ctx.Done():
 			return
@@ -215,6 +212,15 @@ func runMetricPlugin(ctx context.Context, wg *sync.WaitGroup, mp MetricPlugin) {
 			continue
 		}
 	}
+}
+
+func runMetricPluginAtOnce(ctx context.Context, mp MetricPlugin) error {
+	metrics, err := executeCommand(ctx, mp)
+	if err != nil {
+		return fmt.Errorf("[%s] %w", mp.ID(), err)
+	}
+	mp.Enqueue(metrics)
+	return nil
 }
 
 func executeCommand(ctx context.Context, mp MetricPlugin) ([]*Metric, error) {

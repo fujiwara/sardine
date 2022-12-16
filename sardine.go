@@ -61,6 +61,43 @@ func Run(ctx context.Context, configPath string) error {
 	return nil
 }
 
+func RunAtOnce(ctx context.Context, configPath string) error {
+	cch := make(chan *cloudwatch.PutMetricDataInput, 10000)
+	mch := make(chan ServiceMetric, 10000)
+	conf, err := LoadConfig(ctx, configPath)
+	if err != nil {
+		return err
+	}
+
+	wg := new(sync.WaitGroup)
+	for _, _mp := range conf.MetricPlugins {
+		switch mp := _mp.(type) {
+		case *CloudWatchMetricPlugin:
+			mp.Ch = cch
+			log.Printf("[%s] run", mp.ID())
+			runMetricPluginAtOnce(ctx, mp)
+		case *MackerelMetricPlugin:
+			mp.Ch = mch
+			log.Printf("[%s] run", mp.ID())
+			runMetricPluginAtOnce(ctx, mp)
+		}
+	}
+	for _, cp := range conf.CheckPlugins {
+		log.Printf("[%s] run", cp.ID)
+		cp.RunAtOnce(ctx, cch)
+	}
+	close(cch)
+	close(mch)
+	wg.Add(2)
+	putToCloudWatch(ctx, wg, cch)
+	putToMackerel(ctx, wg, mch)
+
+	log.Println("shutting down. waiting for complete...")
+	wg.Wait()
+	log.Println("shutdown complete")
+	return nil
+}
+
 func putToCloudWatch(ctx context.Context, wg *sync.WaitGroup, ch chan *cloudwatch.PutMetricDataInput) {
 	defer wg.Done()
 	region := os.Getenv("AWS_REGION")
@@ -74,7 +111,11 @@ func putToCloudWatch(ctx context.Context, wg *sync.WaitGroup, ch chan *cloudwatc
 		select {
 		case <-ctx.Done():
 			return
-		case in := <-ch:
+		case in, ok := <-ch:
+			if !ok {
+				log.Println("putToCloudWatch: channel closed")
+				return
+			}
 			if Debug {
 				b, _ := json.Marshal(in)
 				log.Printf("putToCloudWatch: %s", b)
@@ -95,7 +136,11 @@ func putToMackerel(ctx context.Context, wg *sync.WaitGroup, ch chan ServiceMetri
 		select {
 		case <-ctx.Done():
 			return
-		case in := <-ch:
+		case in, ok := <-ch:
+			if !ok {
+				log.Println("putToMackerel: channel closed")
+				return
+			}
 			if len(in.MetricValues) == 0 {
 				continue
 			}
