@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	config "github.com/kayac/go-config"
 	shellwords "github.com/mattn/go-shellwords"
 )
@@ -40,15 +40,15 @@ type PluginConfig struct {
 
 type Dimension string
 
-func (d *Dimension) CloudWatchDimensions() ([]*cloudwatch.Dimension, error) {
-	var ds []*cloudwatch.Dimension
+func (d *Dimension) CloudWatchDimensions() ([]types.Dimension, error) {
+	var ds []types.Dimension
 	for _, df := range strings.Split(string(*d), ",") {
 		cols := strings.SplitN(df, "=", 2)
 		if len(cols) != 2 {
 			return nil, fmt.Errorf("invalid dimension: %s", df)
 		}
 		ds = append(ds,
-			&cloudwatch.Dimension{
+			types.Dimension{
 				Name:  aws.String(cols[0]),
 				Value: aws.String(cols[1]),
 			},
@@ -65,7 +65,7 @@ func (pc *PluginConfig) NewCloudWatchMetricPlugin(id string) (*CloudWatchMetricP
 	if err != nil {
 		return nil, fmt.Errorf("parse command failed: %w", err)
 	}
-	dimensions := [][]*cloudwatch.Dimension{}
+	dimensions := [][]types.Dimension{}
 	for _, d := range pc.Dimensions {
 		if ds, err := d.CloudWatchDimensions(); err != nil {
 			return nil, err

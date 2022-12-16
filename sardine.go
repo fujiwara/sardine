@@ -3,14 +3,14 @@ package sardine
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	awsConfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	mackerel "github.com/mackerelio/mackerel-client-go"
 )
 
@@ -57,8 +57,13 @@ func Run(ctx context.Context, configPath string) error {
 }
 
 func putToCloudWatch(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
-	sess := session.Must(session.NewSession())
-	svc := cloudwatch.New(sess)
+	region := os.Getenv("AWS_REGION")
+	awscfg, err := awsConfig.LoadDefaultConfig(ctx, awsConfig.WithRegion(region))
+	if err != nil {
+		panic(fmt.Errorf("failed to load aws config: %w", err))
+		return
+	}
+	svc := cloudwatch.NewFromConfig(awscfg)
 
 	for {
 		select {
@@ -69,7 +74,7 @@ func putToCloudWatch(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput
 				b, _ := json.Marshal(in)
 				log.Printf("putToCloudWatch: %s", b)
 			}
-			_, err := svc.PutMetricDataWithContext(ctx, in, request.WithResponseReadTimeout(30*time.Second))
+			_, err := svc.PutMetricData(ctx, in)
 			if err != nil {
 				log.Println("PutMetricData to CloudWatch failed:", err)
 			}

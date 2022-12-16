@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"github.com/Songmu/timeout"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 )
 
 type CheckPlugin struct {
@@ -19,7 +20,7 @@ type CheckPlugin struct {
 	Command    []string
 	Timeout    time.Duration
 	Interval   time.Duration
-	Dimensions [][]*cloudwatch.Dimension
+	Dimensions [][]types.Dimension
 }
 
 //go:generate stringer -type CheckResult
@@ -32,8 +33,8 @@ const (
 	CheckUnknown
 )
 
-func (r CheckResult) NewMetricDatum(ds []*cloudwatch.Dimension, ts time.Time) *cloudwatch.MetricDatum {
-	return &cloudwatch.MetricDatum{
+func (r CheckResult) NewMetricDatum(ds []types.Dimension, ts time.Time) types.MetricDatum {
+	return types.MetricDatum{
 		MetricName: aws.String(r.String()),
 		Value:      aws.Float64(1),
 		Timestamp:  &ts,
@@ -51,7 +52,7 @@ func (cp *CheckPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDat
 			log.Printf("[%s] %s %s", cp.ID, res, err)
 		}
 
-		md := make([]*cloudwatch.MetricDatum, 0, len(cp.Dimensions)+1)
+		md := make([]types.MetricDatum, 0, len(cp.Dimensions)+1)
 		for _, ds := range cp.Dimensions {
 			md = append(md, res.NewMetricDatum(ds, now))
 		}
