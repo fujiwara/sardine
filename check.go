@@ -11,7 +11,6 @@ import (
 	"github.com/Songmu/timeout"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
-	"github.com/pkg/errors"
 )
 
 type CheckPlugin struct {
@@ -99,10 +98,10 @@ func (cp *CheckPlugin) Execute(ctx context.Context) (CheckResult, error) {
 		log.Printf("[%s] %s", cp.ID, stderr)
 	}
 	if status.IsTimedOut() || status.IsKilled() {
-		return CheckUnknown, errors.New("command execute timed out")
+		return CheckUnknown, fmt.Errorf("command execute timed out")
 	}
 	if err != nil {
-		return CheckUnknown, errors.Wrap(err, "command execute failed")
+		return CheckUnknown, fmt.Errorf("command execute failed: %w", err)
 	}
 
 	st := status.GetExitCode()

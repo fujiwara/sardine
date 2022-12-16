@@ -14,7 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	mackerel "github.com/mackerelio/mackerel-client-go"
-	"github.com/pkg/errors"
 )
 
 type MetricPlugin interface {
@@ -104,7 +103,7 @@ func (mp *CloudWatchMetricPlugin) Enqueue(metrics []*Metric) {
 func (cmp *CloudWatchMetricPlugin) ParseMetricLine(b string) (*Metric, error) {
 	cols := strings.SplitN(b, "\t", 3)
 	if len(cols) < 3 {
-		return nil, errors.New("invalid metric format. insufficient columns")
+		return nil, fmt.Errorf("invalid metric format. insufficient columns")
 	}
 	name, value, timestamp := cols[0], cols[1], cols[2]
 	var m Metric
@@ -176,7 +175,7 @@ func (mp *MackerelMetricPlugin) Enqueue(metrics []*Metric) {
 func (mp *MackerelMetricPlugin) ParseMetricLine(b string) (*Metric, error) {
 	cols := strings.SplitN(b, "\t", 3)
 	if len(cols) < 3 {
-		return nil, errors.New("invalid metric format. insufficient columns")
+		return nil, fmt.Errorf("invalid metric format. insufficient columns")
 	}
 	name, value, timestamp := cols[0], cols[1], cols[2]
 	m := Metric{Name: name}
@@ -229,10 +228,10 @@ func executeCommand(ctx context.Context, mp MetricPlugin) ([]*Metric, error) {
 		log.Printf("[%s] %s", mp.ID(), stderr)
 	}
 	if err != nil {
-		return nil, errors.Wrapf(err, "command execute failed with exit code %d", status.GetExitCode())
+		return nil, fmt.Errorf("command execute failed with exit code %d: %w", status.GetExitCode(), err)
 	}
 	if status.IsTimedOut() || status.IsKilled() {
-		return nil, errors.New("command execute timed out")
+		return nil, fmt.Errorf("command execute timed out")
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader(stdout))
