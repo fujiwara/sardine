@@ -60,6 +60,10 @@ func envToFlag(f *flag.Flag) {
 		strings.ToLower(strings.Replace(f.Name, "-", "_", -1)),
 	}
 	for _, name := range names {
+		if s := os.Getenv("SARDINE_" + name); s != "" {
+			f.Value.Set(s)
+			break
+		}
 		if s := os.Getenv(name); s != "" {
 			f.Value.Set(s)
 			break
