@@ -1,6 +1,7 @@
 package sardine
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -149,7 +150,7 @@ func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
 	return cp, nil
 }
 
-func LoadConfig(path string) (*Config, error) {
+func LoadConfig(ctx context.Context, path string) (*Config, error) {
 	c := &Config{
 		CheckPlugins:  make(map[string]*CheckPlugin),
 		MetricPlugins: make(map[string]MetricPlugin),

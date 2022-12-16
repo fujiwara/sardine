@@ -1,14 +1,19 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
 	"time"
 
 	"github.com/fujiwara/sardine"
+	"golang.org/x/sys/unix"
 )
+
+var trapSignals = []os.Signal{os.Interrupt, unix.SIGTERM}
 
 func main() {
 	var config string
@@ -29,7 +34,11 @@ func main() {
 		log.Printf("sleeping %s", sleep)
 		time.Sleep(sleep)
 	}
-	err := sardine.Run(config)
+
+	ctx, stop := signal.NotifyContext(context.Background(), trapSignals...)
+	defer stop()
+
+	err := sardine.Run(ctx, config)
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)

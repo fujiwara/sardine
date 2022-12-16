@@ -22,15 +22,13 @@ var (
 	maxMetricDatum = 20
 )
 
-func Run(configPath string) error {
+func Run(ctx context.Context, configPath string) error {
 	cch := make(chan *cloudwatch.PutMetricDataInput, 1000)
 	mch := make(chan ServiceMetric, 1000)
-	conf, err := LoadConfig(configPath)
+	conf, err := LoadConfig(ctx, configPath)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
