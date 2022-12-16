@@ -1,4 +1,4 @@
-LATEST_TAG := $(shell git describe --abbrev=0 --tags)
+GIT_VER := $(shell git describe --abbrev=0 --tags)
 
 binary: cmd/sardine/sardine
 
