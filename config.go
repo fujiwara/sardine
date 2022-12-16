@@ -3,11 +3,18 @@ package sardine
 import (
 	"context"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	config "github.com/kayac/go-config"
 	shellwords "github.com/mattn/go-shellwords"
 )
@@ -155,8 +162,11 @@ func LoadConfig(ctx context.Context, path string) (*Config, error) {
 		CheckPlugins:  make(map[string]*CheckPlugin),
 		MetricPlugins: make(map[string]MetricPlugin),
 	}
-
-	if err := config.LoadWithEnvTOML(&c, path); err != nil {
+	configBytes, err := loadURL(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+	if err := config.LoadWithEnvTOMLBytes(c, configBytes); err != nil {
 		return nil, err
 	}
 
@@ -196,4 +206,52 @@ func LoadConfig(ctx context.Context, path string) (*Config, error) {
 	c.Plugin = nil
 
 	return c, nil
+}
+
+func loadURL(ctx context.Context, p string) ([]byte, error) {
+	u, err := url.Parse(p)
+	if err != nil {
+		return nil, err
+	}
+	switch u.Scheme {
+	case "http", "https":
+		return fetchHTTP(ctx, u)
+	case "s3":
+		return fetchS3(ctx, u)
+	case "file", "":
+		return os.ReadFile(u.Path)
+	default:
+		return nil, fmt.Errorf("unsupported scheme %s", u.Scheme)
+	}
+}
+
+func fetchHTTP(ctx context.Context, u *url.URL) ([]byte, error) {
+	log.Println("fetching HTTP", u)
+	req, _ := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return io.ReadAll(resp.Body)
+}
+
+func fetchS3(ctx context.Context, u *url.URL) ([]byte, error) {
+	bucket, key := u.Host, strings.TrimPrefix(u.Path, "/")
+	log.Printf("fetching S3 bucket=%s key=%s", bucket, key)
+	region := os.Getenv("AWS_REGION")
+	awscfg, err := awsConfig.LoadDefaultConfig(ctx, awsConfig.WithRegion(region))
+	if err != nil {
+		panic(fmt.Errorf("failed to load aws config: %w", err))
+	}
+	svc := s3.NewFromConfig(awscfg)
+	out, err := svc.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get s3 object: %w", err)
+	}
+	defer out.Body.Close()
+	return io.ReadAll(out.Body)
 }
