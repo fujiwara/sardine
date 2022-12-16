@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sync"
 	"time"
 
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
@@ -30,9 +29,6 @@ func Run(ctx context.Context, configPath string) error {
 		return err
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
 	go putToCloudWatch(ctx, cch)
 	go putToMackerel(ctx, mch)
 
@@ -52,7 +48,8 @@ func Run(ctx context.Context, configPath string) error {
 		time.Sleep(time.Second)
 	}
 
-	wg.Wait()
+	<-ctx.Done()
+	log.Println("shutting down")
 	return nil
 }
 
@@ -61,7 +58,6 @@ func putToCloudWatch(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput
 	awscfg, err := awsConfig.LoadDefaultConfig(ctx, awsConfig.WithRegion(region))
 	if err != nil {
 		panic(fmt.Errorf("failed to load aws config: %w", err))
-		return
 	}
 	svc := cloudwatch.NewFromConfig(awscfg)
 
