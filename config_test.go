@@ -1,6 +1,7 @@
 package sardine_test
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -9,7 +10,7 @@ import (
 )
 
 func TestLoadConfig(t *testing.T) {
-	c, err := sardine.LoadConfig("test/config.toml")
+	c, err := sardine.LoadConfig(context.Background(), "test/config.toml")
 	if err != nil {
 		t.Error(err)
 	}

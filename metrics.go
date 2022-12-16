@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/Songmu/timeout"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	mackerel "github.com/mackerelio/mackerel-client-go"
 )
 
@@ -32,8 +33,8 @@ type Metric struct {
 	Timestamp time.Time
 }
 
-func (m *Metric) NewMetricDatum(ds []*cloudwatch.Dimension) *cloudwatch.MetricDatum {
-	return &cloudwatch.MetricDatum{
+func (m *Metric) NewMetricDatum(ds []types.Dimension) types.MetricDatum {
+	return types.MetricDatum{
 		MetricName: &m.Name,
 		Value:      &m.Value,
 		Timestamp:  &m.Timestamp,
@@ -51,7 +52,7 @@ type CloudWatchMetricPlugin struct {
 	command    []string
 	timeout    time.Duration
 	interval   time.Duration
-	Dimensions [][]*cloudwatch.Dimension
+	Dimensions [][]types.Dimension
 	Ch         chan *cloudwatch.PutMetricDataInput
 }
 
@@ -72,7 +73,7 @@ func (mp *CloudWatchMetricPlugin) Interval() time.Duration {
 }
 
 func (mp *CloudWatchMetricPlugin) Enqueue(metrics []*Metric) {
-	mds := make(map[string][]*cloudwatch.MetricDatum, len(mp.Dimensions)+1)
+	mds := make(map[string][]types.MetricDatum, len(mp.Dimensions)+1)
 	for _, metric := range metrics {
 		ns := metric.Namespace
 		for _, ds := range mp.Dimensions {
