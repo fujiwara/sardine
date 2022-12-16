@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Songmu/timeout"
@@ -196,7 +197,8 @@ func (mp *MackerelMetricPlugin) ParseMetricLine(b string) (*Metric, error) {
 	return &m, nil
 }
 
-func runMetricPlugin(ctx context.Context, mp MetricPlugin) {
+func runMetricPlugin(ctx context.Context, wg *sync.WaitGroup, mp MetricPlugin) {
+	defer wg.Done()
 	ticker := time.NewTicker(mp.Interval())
 	log.Printf("[%s] starting", mp.ID())
 	for {

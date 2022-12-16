@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"sync"
 	"syscall"
 	"time"
 
@@ -42,7 +43,8 @@ func (r CheckResult) NewMetricDatum(ds []types.Dimension, ts time.Time) types.Me
 	}
 }
 
-func (cp *CheckPlugin) Run(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
+func (cp *CheckPlugin) Run(ctx context.Context, wg *sync.WaitGroup, ch chan *cloudwatch.PutMetricDataInput) {
+	defer wg.Done()
 	ticker := time.NewTicker(cp.Interval)
 	log.Printf("[%s] starting", cp.ID)
 	now := time.Now()

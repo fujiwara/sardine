@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
@@ -29,31 +30,39 @@ func Run(ctx context.Context, configPath string) error {
 		return err
 	}
 
-	go putToCloudWatch(ctx, cch)
-	go putToMackerel(ctx, mch)
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+	go putToCloudWatch(ctx, wg, cch)
+	go putToMackerel(ctx, wg, mch)
 
 	for _, _mp := range conf.MetricPlugins {
 		switch mp := _mp.(type) {
 		case *CloudWatchMetricPlugin:
 			mp.Ch = cch
-			go runMetricPlugin(ctx, mp)
+			wg.Add(1)
+			go runMetricPlugin(ctx, wg, mp)
 		case *MackerelMetricPlugin:
 			mp.Ch = mch
-			go runMetricPlugin(ctx, mp)
+			wg.Add(1)
+			go runMetricPlugin(ctx, wg, mp)
 		}
 		time.Sleep(time.Second)
 	}
 	for _, cp := range conf.CheckPlugins {
-		go cp.Run(ctx, cch)
+		wg.Add(1)
+		go cp.Run(ctx, wg, cch)
 		time.Sleep(time.Second)
 	}
 
 	<-ctx.Done()
-	log.Println("shutting down")
+	log.Println("shutting down. waiting for complete...")
+	wg.Wait()
+	log.Println("shutdown complete")
 	return nil
 }
 
-func putToCloudWatch(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput) {
+func putToCloudWatch(ctx context.Context, wg *sync.WaitGroup, ch chan *cloudwatch.PutMetricDataInput) {
+	defer wg.Done()
 	region := os.Getenv("AWS_REGION")
 	awscfg, err := awsConfig.LoadDefaultConfig(ctx, awsConfig.WithRegion(region))
 	if err != nil {
@@ -78,7 +87,8 @@ func putToCloudWatch(ctx context.Context, ch chan *cloudwatch.PutMetricDataInput
 	}
 }
 
-func putToMackerel(ctx context.Context, ch chan ServiceMetric) {
+func putToMackerel(ctx context.Context, wg *sync.WaitGroup, ch chan ServiceMetric) {
+	defer wg.Done()
 	c := mackerel.NewClient(os.Getenv("MACKEREL_APIKEY"))
 
 	for {
