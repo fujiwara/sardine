@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	config "github.com/kayac/go-config"
 	shellwords "github.com/mattn/go-shellwords"
-	"github.com/pkg/errors"
 )
 
 type Config struct {
@@ -59,11 +58,11 @@ func (d *Dimension) CloudWatchDimensions() ([]*cloudwatch.Dimension, error) {
 
 func (pc *PluginConfig) NewCloudWatchMetricPlugin(id string) (*CloudWatchMetricPlugin, error) {
 	if pc.Command == "" {
-		return nil, errors.New("command required")
+		return nil, fmt.Errorf("command required")
 	}
 	args, err := shellwords.Parse(pc.Command)
 	if err != nil {
-		return nil, errors.Wrap(err, "parse command failed")
+		return nil, fmt.Errorf("parse command failed: %w", err)
 	}
 	dimensions := [][]*cloudwatch.Dimension{}
 	for _, d := range pc.Dimensions {
@@ -91,14 +90,14 @@ func (pc *PluginConfig) NewCloudWatchMetricPlugin(id string) (*CloudWatchMetricP
 
 func (pc *PluginConfig) NewMackerelMetricPlugin(id string) (*MackerelMetricPlugin, error) {
 	if pc.Command == "" {
-		return nil, errors.New("command required")
+		return nil, fmt.Errorf("command required")
 	}
 	if pc.Service == "" {
-		return nil, errors.New("service required")
+		return nil, fmt.Errorf("service required")
 	}
 	args, err := shellwords.Parse(pc.Command)
 	if err != nil {
-		return nil, errors.Wrap(err, "parse command failed")
+		return nil, fmt.Errorf("parse command failed: %w", err)
 	}
 	mp := &MackerelMetricPlugin{
 		id:       fmt.Sprintf("plugin.servicemetrics.%s", id),
@@ -118,14 +117,14 @@ func (pc *PluginConfig) NewMackerelMetricPlugin(id string) (*MackerelMetricPlugi
 
 func (pc *PluginConfig) NewCheckPlugin(id string) (*CheckPlugin, error) {
 	if pc.Namespace == "" {
-		return nil, errors.New("namespace required")
+		return nil, fmt.Errorf("namespace required")
 	}
 	if pc.Command == "" {
-		return nil, errors.New("command required")
+		return nil, fmt.Errorf("command required")
 	}
 	args, err := shellwords.Parse(pc.Command)
 	if err != nil {
-		return nil, errors.Wrap(err, "parse command failed")
+		return nil, fmt.Errorf("parse command failed: %w", err)
 	}
 	cp := &CheckPlugin{
 		ID:        fmt.Sprintf("plugin.check.%s", id),
